@@ -27,16 +27,27 @@ Column order (RAWMAP in `firmware/ha/ha_read.py`):
 - **Deliberate events** — note timestamps when you change fan speed, run a
   shower, open a window, or (later) swap/reset the filter.
 
-## Method A — Home Assistant native (least effort)
+## Method A — Home Assistant native (least effort, RECOMMENDED)
 
-1. Merge `docs/ha-diagnostics.yaml` into `configuration.yaml` under the
-   top-level `mqtt:` key and restart HA. It creates 16 `diagnostic` sensors
-   ("MRXBOX raw 33_3" etc.) that HA records automatically.
-2. Add **Met.no** for outdoor temp.
-3. After a few days, open **History**, overlay each `MRXBOX raw *` sensor
-   against Met.no outdoor temp / time / humidity. Whichever tracks outdoor
-   temp is the outdoor sensor; a slow upward ramp is a counter; a daily cycle
-   is a temperature.
+Done via **MQTT auto-discovery**, so no `configuration.yaml` edit and no add-on
+(the older `docs/ha-diagnostics.yaml` YAML route is superseded by this):
+
+1. One-time: publish the 16 diagnostic sensors as retained discovery configs:
+   ```
+   python3 tools/publish_raw_discovery.py 192.168.0.54 pico <mqtt_pass>
+   ```
+   HA auto-creates `sensor.nuaire_mrxbox_eco2_mrxbox_raw_*` (grouped under the
+   MRXBOX device, entity_category diagnostic) and the recorder logs their
+   history automatically. Discovery is retained -> survives HA restarts; re-run
+   only after a broker wipe. `--clear` removes them.
+2. Add **Met.no** for outdoor temp (Settings -> Devices & Services -> Add).
+3. After a few days, either open **History** and overlay each `MRXBOX raw *`
+   sensor against outdoor temp / time / humidity, or pull the recorder history
+   over the HA REST API (`/api/history/period/...`) and correlate offline.
+
+Reference temperatures already in HA (no setup needed): the per-room sensors
+(Bedroom / Office / Living Room). The MVHR extract byte should track indoor
+temp; the intake byte should track outdoor (Met.no). Strong decode leverage.
 
 ## Method B — raw CSV + offline analysis (most powerful)
 

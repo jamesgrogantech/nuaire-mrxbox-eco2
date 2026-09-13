@@ -8,6 +8,14 @@
 #   humidity = msg 3B byte1 rev -> RH%;  temp = msg 33 byte3 rev -> C;
 #   boost    = msg 21 byte2 bit 0x02 (ON when clear)
 # Setup: mpremote mip install umqtt.simple; cp secrets.py + this as :main.py
+#
+# Resilience: a hardware WDT (8.388s, the RP2040 max) is fed at the top of the
+# main loop and between each network op. The board used to hang until manual
+# repower (WiFi/socket lockup, no watchdog); a *fed* WDT self-heals any hang in
+# <9s. The trick that avoids the old false-trips: feed BETWEEN network calls so
+# a slow-but-progressing broker never trips it, while a genuine stuck call does.
+# Every blocking wait (WiFi bring-up, reconnect) either feeds each second or is
+# short enough to reset the board before the WDT would fire.
 import network, time, ujson, ubinascii, machine, secrets, os
 from machine import UART, Pin
 from umqtt.simple import MQTTClient
@@ -24,11 +32,15 @@ except: pass
 try: w.ifconfig(('192.168.0.90','255.255.255.0','192.168.0.1','192.168.0.1'))
 except: pass
 w.connect(secrets.WIFI_SSID, secrets.WIFI_PASS)
+# WDT armed here so a hang anywhere past this point self-heals. 8388ms = RP2040
+# max. The wait loop below feeds every second, so WiFi association (which can
+# take >8s) never trips it; only a truly stuck call does.
+wdt = machine.WDT(timeout=8388)
 for _ in range(30):
     if w.isconnected(): break
-    time.sleep(1)
+    wdt.feed(); time.sleep(1)
 if not w.isconnected():
-    time.sleep(5); machine.reset()
+    machine.reset()   # <5s to here, so we reset before the WDT would fire
 
 def connect():
     cid = b'nuaire_' + ubinascii.hexlify(os.urandom(4))
@@ -55,7 +67,8 @@ def connect():
                   ujson.dumps(p).encode('utf-8'), retain=True)
     return c
 
-c = connect()
+wdt.feed()
+c = connect()   # if the broker is down this may block; the WDT resets us then
 u = UART(1, baudrate=1200, bits=8, parity=None, stop=1, rx=Pin(5), timeout=0, rxbuf=1024)
 buf = bytearray(); vals = {'humidity': None, 'boost': None}
 # gap-split message assembler for the raw-frame log (additive; the anchored
@@ -70,6 +83,7 @@ RAWMAP = ((0x11,1),(0x11,2),(0x21,1),(0x21,2),(0x21,3),(0x31,3),(0x33,3),
 lastpub = time.ticks_ms(); fails = 0
 
 while True:
+    wdt.feed()   # fast path: loop spins on non-blocking u.read -> fed many times/s
     d = u.read()
     now = time.ticks_us()
     if d:
@@ -86,19 +100,35 @@ while True:
     elif mbuf and time.ticks_diff(now, mlast) > 15000:
         frame[mbuf[0]] = list(mbuf); mbuf = bytearray()
     if time.ticks_diff(time.ticks_ms(), lastpub) >= 15000:
+        # NOTE: do NOT gate on w.isconnected() - the CYW43 goes "zombie" (reports
+        # connected, keeps the IP, sends don't raise) while no traffic actually
+        # flows, so isconnected() lies. The only reliable liveness test is a
+        # round-trip the BROKER must answer: ping + read PINGRESP with a socket
+        # timeout. No answer -> dead link -> hard reset re-inits the WiFi stack.
         try:
             for k in vals:
                 if vals[k] is not None:
                     c.publish('nuaire/'+k, str(vals[k]), retain=True)
+                    wdt.feed()   # feed between ops: slow broker != hang
             raw = []
             for h, pos in RAWMAP:
                 m = frame.get(h)
                 raw.append(str(rev(m[pos])) if m and len(m) > pos else '-1')
             c.publish('nuaire/raw', ','.join(raw), retain=True)
+            wdt.feed()
             c.ping()
+            c.sock.settimeout(3)
+            c.wait_msg()         # expects PINGRESP; zombie link -> timeout -> except
+            wdt.feed()
             fails = 0
         except Exception:
+            # dead link (or broker gone). One quick reconnect attempt; if two
+            # cycles in a row fail (~30s), hard-reset to rebuild the WiFi stack.
             fails += 1
-            if fails >= 8:
+            if fails >= 2:
+                machine.reset()
+            try:
+                c = connect()
+            except Exception:
                 machine.reset()
         lastpub = time.ticks_ms()
