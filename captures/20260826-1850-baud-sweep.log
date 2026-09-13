@@ -1,0 +1,27 @@
+# modpoll ready. baud=9600. commands: sweep / read a f s c / baud N / fc N / marker
+# marker t=11666ms baud sweep addr 1-8 fc03
+# --- baud 9600 ---
+# sweep addr 1..8 fcs ['0x3'] baud 9600
+# sweep done, 0 valid replies
+# --- baud 19200 ---
+# sweep addr 1..8 fcs ['0x3'] baud 19200
+# sweep done, 0 valid replies
+# --- baud 4800 ---
+# sweep addr 1..8 fcs ['0x3'] baud 4800
+# sweep done, 0 valid replies
+# --- baud 38400 ---
+# sweep addr 1..8 fcs ['0x3'] baud 38400
+# sweep done, 0 valid replies
+# --- baud 2400 ---
+# sweep addr 1..8 fcs ['0x3'] baud 2400
+junk addr=7 fc=0x03 -> D0 10 10 10 10 88 4A FB
+# sweep done, 0 valid replies
+# --- baud 57600 ---
+# sweep addr 1..8 fcs ['0x3'] baud 57600
+# sweep done, 0 valid replies
+# --- baud 115200 ---
+# sweep addr 1..8 fcs ['0x3'] baud 115200
+# sweep done, 0 valid replies
+# --- baud 1200 ---
+# sweep addr 1..8 fcs ['0x3'] baud 1200
+# sweep done, 0 valid replies

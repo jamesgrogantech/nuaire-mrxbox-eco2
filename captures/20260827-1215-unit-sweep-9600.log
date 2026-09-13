@@ -1,0 +1,4 @@
+# modpoll ready. baud=9600. commands: sweep / read a f s c / baud N / fc N / marker
+# marker t=34876ms unit connected - sweep 9600 8N1
+# sweep addr 1..32 fcs ['0x3', '0x4', '0x1', '0x2'] baud 9600
+# sweep done, 0 valid replies

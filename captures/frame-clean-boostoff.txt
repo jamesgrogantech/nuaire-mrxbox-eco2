@@ -1,0 +1,10 @@
+# 1200 8N1 decode: 64 messages, 9 distinct headers, cap=5000ms
+11 x7  : 11 F6 4C
+21 x7  : 21 AA F6 D6
+31 x7  : 31 FE FE 9A
+33 x7  : 33 FE FE 98
+3B x8  : 3B 62 54 A6
+51 x7  : 51 FE FE FE 04
+75 x7  : 75 FE FE FE FE DE
+85 x7  : 85 2E FE 30 FE FE CE
+A3 x7  : A3 FE FE FE FE FE FE 08

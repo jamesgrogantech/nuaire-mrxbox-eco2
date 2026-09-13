@@ -1,0 +1,8 @@
+# Nuaire MRXBOX ECO2 display connector — PASSIVE listen via CH340 USB-RS485 dongle
+# 2026-08-28. Unit powered, no display present. Dongle A+/B-/GND on connector.
+# Real periodic broadcast, ~0.7s repeat, 54-byte frame. Baud ~1990 (non-standard).
+# ~90% stable across repeats; bytes bit-smeared (baud not exactly resolvable by UART).
+# Best-guess 8N1 @ 1990 baud, three consecutive frames:
+03 8C 93 90 90 FF 82 10 FF 70 FF 83 13 FC FC 10 82 8C FC EC FC 8F 8C FC E0 FC 13 70 8C 80 8C FC 70 0E 8F FC FC FC FC FC 60 92 C2 FC FC FC FC FF EF 8C 0C 90 13 F2
+03 8C 92 90 90 FF 82 10 FE 70 FF 83 13 FC FC 10 82 8C FC EC FC 8E 8C FC E0 FC 13 70 8C 80 8C FC 70 0E 8F FC FC FC FC FC 60 92 C2 FC FC FC FC FF EE 8C 0C 90 13 F2
+03 8C 92 90 90 FF 83 10 FE 70 FF 83 13 FC FC 10 82 8C FC EC FC 8F 8C FC E0 FC 13 70 8C 80 8C FC 70 0E 8F FC FC FC FC FC 60 92 E3 FC FC FC FC FF EF 8C 0C 90 12 F3

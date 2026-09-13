@@ -1,0 +1,13 @@
+# Nuaire MRXBOX ECO2 display bus — CLEAN DECODE
+# 2026-08-28. Baud found via Pico pulse-timing = 825us/bit = 1200 baud 8N1.
+# Decoded via Pico UART1 (RO->GP5). Frame repeats byte-identical every ~0.7s.
+# 9 gap-separated messages per cycle (state: rest, boost as last set):
+21 AA F4 D4
+11 F6 4C
+51 FE FE FE 04
+31 FE FE 9A
+33 FE FE 98
+85 2E FE 30 FE FE CE
+A3 FE FE FE FE FE FE 08
+75 FE FE FE FE DE
+3B C2 54 06

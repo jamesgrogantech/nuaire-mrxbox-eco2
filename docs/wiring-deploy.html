@@ -1,0 +1,184 @@
+<title>MRXBOX HA Deploy Wiring</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #f2f5f6; --surface: #ffffff; --ink: #1d2733; --muted: #5c6b78;
+    --line: #d3dbe0; --warn-bg: #fdf3e4; --warn-edge: #c77c1b; --warn-ink: #6b4a12;
+    --w-pwr: #d43d2a; --w-5v: #e08a1e; --w-gnd: #4a545e; --w-a: #d97a00;
+    --w-b: #2f6fd0; --w-ro: #1f8a4c; --w-33: #8a4fc4;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #131a21; --surface: #1a232c; --ink: #e2e9ef; --muted: #92a3b0;
+    --line: #2d3a45; --warn-bg: #2b2214; --warn-edge: #e09b3c; --warn-ink: #eecf9b;
+    --w-pwr: #ff6d55; --w-5v: #f5b24a; --w-gnd: #b9c4cc;
+    --w-a: #f5a13c; --w-b: #6ea8ff; --w-ro: #46c47c; --w-33: #b98cf0;
+  }}
+  :root[data-theme="dark"] {
+    --bg: #131a21; --surface: #1a232c; --ink: #e2e9ef; --muted: #92a3b0;
+    --line: #2d3a45; --warn-bg: #2b2214; --warn-edge: #e09b3c; --warn-ink: #eecf9b;
+    --w-pwr: #ff6d55; --w-5v: #f5b24a; --w-gnd: #b9c4cc; --w-a: #f5a13c;
+    --w-b: #6ea8ff; --w-ro: #46c47c; --w-33: #b98cf0;
+  }
+  body { background: var(--bg); color: var(--ink);
+    font-family: "IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
+    line-height: 1.55; margin: 0; padding: 2.5rem 1.25rem 4rem; }
+  main { max-width: 920px; margin: 0 auto; }
+  .eyebrow { font-family: "IBM Plex Mono",monospace; font-size: .75rem;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 .5rem; }
+  h1 { font-size: clamp(1.6rem,4vw,2.2rem); font-weight: 700; letter-spacing: -.01em;
+    margin: 0 0 .35rem; text-wrap: balance; }
+  .subtitle { color: var(--muted); margin: 0 0 1.75rem; max-width: 62ch; }
+  .warnbar { display: flex; gap: .7rem; align-items: baseline; background: var(--warn-bg);
+    border-left: 4px solid var(--warn-edge); color: var(--warn-ink); border-radius: 6px;
+    padding: .8rem 1rem; margin: 0 0 1.25rem; font-size: .95rem; }
+  figure { margin: 0 0 2.25rem; background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1.25rem 1rem .9rem; }
+  .diagram-scroll { overflow-x: auto; }
+  .diagram-scroll svg { display: block; min-width: 760px; max-width: 100%; height: auto; margin: 0 auto; }
+  figcaption { font-size: .85rem; color: var(--muted); padding: .8rem .35rem .2rem; max-width: 75ch; }
+  h2 { font-size: 1.05rem; font-weight: 600; margin: 2.2rem 0 .7rem; }
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: .92rem; background: var(--surface);
+    border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  th,td { text-align: left; padding: .55rem .8rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  th { font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  code { font-family: "IBM Plex Mono",monospace; font-size: .86em; }
+  .swatch { display: inline-block; width: .85em; height: .85em; border-radius: 3px; margin-right: .45em; vertical-align: -.08em; }
+  ul { padding-left: 1.2rem; margin: .4rem 0 0; } li { margin: .35rem 0; max-width: 72ch; }
+  li::marker { color: var(--muted); }
+  .footnote { color: var(--muted); font-size: .85rem; margin-top: 2.5rem; }
+</style>
+
+<main>
+  <p class="eyebrow">Nuaire MRXBOX ECO2 · Home Assistant · read-only deploy</p>
+  <h1>MRXBOX HA Deploy Wiring</h1>
+  <p class="subtitle">Permanent install: powered from the unit's own 12&nbsp;V via a buck converter, reading the bus at 1200&nbsp;baud over WiFi to Home Assistant. No laptop, no USB.</p>
+
+  <div class="warnbar"><strong>Set the buck output to 5.0&nbsp;V with a meter BEFORE wiring it to the Pico.</strong>
+    <span>Trim-pot bucks ship at random voltages; VSYS tolerates max 5.5&nbsp;V, and 12&nbsp;V straight in destroys the Pico.</span>
+  </div>
+
+  <figure>
+    <div class="diagram-scroll">
+    <svg viewBox="0 0 980 560" role="img" aria-label="Deployment wiring: MVHR connector 12V through a buck converter set to 5V into Pico VSYS pin 39; MVHR GND common to buck, Pico, and MAX485; MVHR A/B to the MAX485 which feeds RO to GP5; MAX485 VCC from Pico 3V3, DE and RE tied to ground for receive-only.">
+      <g fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="30"  y="150" width="150" height="250" rx="8"/>
+        <rect x="300" y="60"  width="150" height="90"  rx="8"/>
+        <rect x="300" y="250" width="160" height="150" rx="8"/>
+        <rect x="640" y="120" width="150" height="320" rx="8"/>
+      </g>
+      <g font-family="'IBM Plex Sans',sans-serif" font-weight="600" font-size="14" fill="currentColor">
+        <text x="105" y="175" text-anchor="middle">MVHR connector</text>
+        <text x="375" y="85"  text-anchor="middle">Buck converter</text>
+        <text x="380" y="275" text-anchor="middle">MAX485 (3.3V)</text>
+        <text x="715" y="145" text-anchor="middle">Pico W</text>
+      </g>
+      <g font-family="'IBM Plex Mono',monospace" font-size="11" fill="var(--muted)">
+        <text x="375" y="102" text-anchor="middle">12V in → 5V out</text>
+        <text x="375" y="118" text-anchor="middle">SET 5V FIRST</text>
+        <text x="380" y="291" text-anchor="middle">receive-only</text>
+      </g>
+
+      <!-- MVHR pins -->
+      <g font-family="'IBM Plex Mono',monospace" font-size="12" fill="currentColor">
+        <text x="60" y="215">12V</text><text x="60" y="255">GND</text>
+        <text x="60" y="295">A</text><text x="60" y="335">B</text>
+      </g>
+      <g fill="currentColor">
+        <circle cx="180" cy="210" r="3.5"/><circle cx="180" cy="250" r="3.5"/>
+        <circle cx="180" cy="290" r="3.5"/><circle cx="180" cy="330" r="3.5"/>
+      </g>
+
+      <!-- 12V -> buck in -->
+      <path d="M180 210 H240 V95 H300" fill="none" stroke="var(--w-pwr)" stroke-width="2.5"/>
+      <polygon points="298,90 308,95 298,100" fill="var(--w-pwr)"/>
+      <text x="245" y="135" font-family="'IBM Plex Mono',monospace" font-size="11" fill="var(--w-pwr)">12V</text>
+      <!-- buck 5V out -> VSYS -->
+      <path d="M450 105 H545 V300 H632" fill="none" stroke="var(--w-5v)" stroke-width="2.5"/>
+      <polygon points="630,295 640,300 630,305" fill="var(--w-5v)"/>
+      <text x="470" y="98" font-family="'IBM Plex Mono',monospace" font-size="11" fill="var(--w-5v)">5V → VSYS</text>
+      <!-- schottky marker -->
+      <text x="548" y="220" font-family="'IBM Plex Mono',monospace" font-size="10" fill="var(--muted)">◇ Schottky</text>
+      <text x="548" y="233" font-family="'IBM Plex Mono',monospace" font-size="10" fill="var(--muted)">if USB too</text>
+
+      <!-- GND rail (common) -->
+      <path d="M180 250 H210 V470 H770 V445" fill="none" stroke="var(--w-gnd)" stroke-width="2.5"/>
+      <line x1="375" y1="470" x2="375" y2="150" stroke="var(--w-gnd)" stroke-width="1.5" stroke-dasharray="4 4"/>
+      <line x1="380" y1="470" x2="380" y2="400" stroke="var(--w-gnd)" stroke-width="1.5" stroke-dasharray="4 4"/>
+      <polygon points="765,447 770,437 775,447" fill="var(--w-gnd)"/>
+      <text x="230" y="463" font-family="'IBM Plex Mono',monospace" font-size="11" fill="var(--w-gnd)">common GND (unit · buck · MAX485 · Pico)</text>
+
+      <!-- A/B -> MAX485 -->
+      <path d="M180 290 H250 V300 H300" fill="none" stroke="var(--w-a)" stroke-width="2.5"/>
+      <polygon points="298,295 308,300 298,305" fill="var(--w-a)"/>
+      <path d="M180 330 H265 V335 H300" fill="none" stroke="var(--w-b)" stroke-width="2.5"/>
+      <polygon points="298,330 308,335 298,340" fill="var(--w-b)"/>
+      <text x="255" y="290" font-family="'IBM Plex Mono',monospace" font-size="11" fill="var(--w-a)">A</text>
+      <text x="270" y="352" font-family="'IBM Plex Mono',monospace" font-size="11" fill="var(--w-b)">B</text>
+
+      <!-- MAX485 pins -->
+      <g font-family="'IBM Plex Mono',monospace" font-size="11" fill="currentColor">
+        <text x="310" y="304">A</text><text x="310" y="339">B</text>
+        <text x="455" y="304" text-anchor="end">RO</text>
+        <text x="455" y="339" text-anchor="end">VCC</text>
+        <text x="455" y="374" text-anchor="end">DE+RE</text>
+      </g>
+      <!-- RO -> GP5 -->
+      <path d="M460 300 H560 V210 H632" fill="none" stroke="var(--w-ro)" stroke-width="2.5"/>
+      <polygon points="630,205 640,210 630,215" fill="var(--w-ro)"/>
+      <text x="500" y="203" font-family="'IBM Plex Mono',monospace" font-size="11" fill="var(--w-ro)">RO → GP5 (data)</text>
+      <!-- VCC from 3V3 -->
+      <path d="M460 335 H590 V250 H632" fill="none" stroke="var(--w-33)" stroke-width="2.5"/>
+      <polygon points="630,245 640,250 630,255" fill="var(--w-33)"/>
+      <text x="500" y="243" font-family="'IBM Plex Mono',monospace" font-size="11" fill="var(--w-33)">3V3 → VCC</text>
+      <!-- DE+RE to gnd -->
+      <path d="M460 370 H500 V470" fill="none" stroke="var(--w-gnd)" stroke-width="2"/>
+      <text x="466" y="392" font-family="'IBM Plex Mono',monospace" font-size="10" fill="var(--w-gnd)">tie low</text>
+
+      <!-- Pico pins -->
+      <g font-family="'IBM Plex Mono',monospace" font-size="12" fill="currentColor">
+        <text x="650" y="214">GP5 · pin 7</text>
+        <text x="650" y="254">3V3 · pin 36</text>
+        <text x="650" y="304">VSYS · pin 39</text>
+        <text x="650" y="449">GND · pin 38</text>
+      </g>
+      <g fill="currentColor">
+        <circle cx="640" cy="210" r="3.5"/><circle cx="640" cy="250" r="3.5"/>
+        <circle cx="640" cy="300" r="3.5"/><circle cx="770" cy="440" r="3.5"/>
+      </g>
+      <g font-family="'IBM Plex Sans',sans-serif" font-size="11" fill="var(--muted)">
+        <text x="650" y="410">WiFi → Home</text>
+        <text x="650" y="424">Assistant (MQTT)</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption>One 4-pin connector powers and feeds the Pico: 12&nbsp;V through the buck (set to 5&nbsp;V) into VSYS, A/B into the MAX485 whose RO drives GP5. Everything shares one ground. DE+RE tied low = physically receive-only. The Pico reads at 1200&nbsp;8N1 and publishes over WiFi — no USB in service.</figcaption>
+  </figure>
+
+  <h2>Connections</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Wire</th><th>From</th><th>To</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td><span class="swatch" style="background:var(--w-pwr)"></span>12V</td><td>MVHR 12V pin</td><td>Buck <code>IN+</code></td><td>The pin we kept capped until now</td></tr>
+      <tr><td><span class="swatch" style="background:var(--w-5v)"></span>5V</td><td>Buck <code>OUT+</code></td><td>Pico <code>VSYS</code> (pin 39)</td><td>⚠️ set buck to 5.0V first; add a Schottky in series if USB may also be plugged in</td></tr>
+      <tr><td><span class="swatch" style="background:var(--w-gnd)"></span>GND</td><td>MVHR GND</td><td>Buck <code>IN−</code>/<code>OUT−</code>, MAX485 GND, Pico GND (pin 38)</td><td>One common ground for everything</td></tr>
+      <tr><td><span class="swatch" style="background:var(--w-a)"></span>A</td><td>MVHR A</td><td>MAX485 <code>A</code></td><td>If no data: swap A/B (dongle needed the opposite order)</td></tr>
+      <tr><td><span class="swatch" style="background:var(--w-b)"></span>B</td><td>MVHR B</td><td>MAX485 <code>B</code></td><td></td></tr>
+      <tr><td><span class="swatch" style="background:var(--w-ro)"></span>Data</td><td>MAX485 <code>RO</code></td><td>Pico <code>GP5</code> (pin 7)</td><td>UART1 RX, 1200 8N1</td></tr>
+      <tr><td><span class="swatch" style="background:var(--w-33)"></span>3V3</td><td>Pico <code>3V3 OUT</code> (pin 36)</td><td>MAX485 <code>VCC</code></td><td>⚠️ pin 36, never pin 37 (3V3_EN)</td></tr>
+      <tr><td>Jumper</td><td>MAX485 <code>DE</code>+<code>/RE</code></td><td>GND</td><td>Receive-only — cannot transmit</td></tr>
+      <tr><td>—</td><td>MAX485 <code>DI</code></td><td>nothing</td><td>Unused (read-only)</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Bring-up order</h2>
+  <ul>
+    <li><strong>Set the buck to 5.0&nbsp;V</strong> on the bench (12V or any source in, meter on the output, turn the trim-pot) <em>before</em> anything connects to the Pico.</li>
+    <li>Wire grounds first, then A/B to the MAX485, then RO/3V3, then last the buck 5&nbsp;V to VSYS.</li>
+    <li>Power the unit; the Pico boots, joins WiFi, reads the bus. No USB needed — but you can still plug USB for firmware updates (that's why the Schottky matters if both power sources meet).</li>
+    <li>If the MAX485 module has a 120&nbsp;Ω terminator and reception looks noisy on an already-terminated bus, lift it.</li>
+  </ul>
+
+  <p class="footnote">Read-only by design — DE+RE grounded means the Pico physically cannot drive the bus. Firmware reads 1200&nbsp;8N1 on GP5, bit-reverses data bytes, and publishes humidity / temperature / fan state to Home Assistant. Companion to the bench diagram in <code>docs/wiring.html</code> and the field map in <code>docs/protocol.md</code>.</p>
+</main>

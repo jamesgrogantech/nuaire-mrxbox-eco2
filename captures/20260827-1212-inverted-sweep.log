@@ -1,0 +1,72 @@
+# modpoll ready. baud=9600. commands: sweep / read a f s c / baud N / fc N / marker
+# marker t=70204ms inverted A/B sweep
+# --- INVERTED baud 9600 ---
+# sweep addr 1..32 fcs ['0x3'] baud 9600
+junk addr=1 fc=0x03 -> FF
+junk addr=2 fc=0x03 -> FF
+junk addr=3 fc=0x03 -> FF
+junk addr=4 fc=0x03 -> FF
+junk addr=5 fc=0x03 -> FF
+junk addr=6 fc=0x03 -> FF
+junk addr=7 fc=0x03 -> FF
+junk addr=8 fc=0x03 -> FF
+junk addr=9 fc=0x03 -> FF
+junk addr=10 fc=0x03 -> FF
+junk addr=11 fc=0x03 -> FF
+junk addr=12 fc=0x03 -> FF
+junk addr=13 fc=0x03 -> FF
+junk addr=14 fc=0x03 -> FF
+junk addr=15 fc=0x03 -> FF
+junk addr=16 fc=0x03 -> FF
+junk addr=17 fc=0x03 -> FF
+junk addr=18 fc=0x03 -> FF
+junk addr=19 fc=0x03 -> FF
+junk addr=20 fc=0x03 -> FF
+junk addr=21 fc=0x03 -> FF
+junk addr=22 fc=0x03 -> FF
+junk addr=23 fc=0x03 -> FF
+junk addr=24 fc=0x03 -> FF
+junk addr=25 fc=0x03 -> FF
+junk addr=26 fc=0x03 -> FF
+junk addr=27 fc=0x03 -> FF
+junk addr=28 fc=0x03 -> FF
+junk addr=29 fc=0x03 -> FF
+junk addr=30 fc=0x03 -> FF
+junk addr=31 fc=0x03 -> FF
+junk addr=32 fc=0x03 -> FF
+# sweep done, 0 valid replies
+# --- INVERTED baud 19200 ---
+# sweep addr 1..32 fcs ['0x3'] baud 19200
+junk addr=1 fc=0x03 -> FF
+junk addr=2 fc=0x03 -> FF
+junk addr=3 fc=0x03 -> FF
+junk addr=4 fc=0x03 -> FF
+junk addr=5 fc=0x03 -> FF
+junk addr=6 fc=0x03 -> FF
+junk addr=7 fc=0x03 -> FF
+junk addr=8 fc=0x03 -> FF
+junk addr=9 fc=0x03 -> FF
+junk addr=10 fc=0x03 -> FF
+junk addr=11 fc=0x03 -> FF
+junk addr=12 fc=0x03 -> FF
+junk addr=13 fc=0x03 -> FF
+junk addr=14 fc=0x03 -> FF
+junk addr=15 fc=0x03 -> FF
+junk addr=16 fc=0x03 -> FF
+junk addr=17 fc=0x03 -> FF
+junk addr=18 fc=0x03 -> FF
+junk addr=19 fc=0x03 -> FF
+junk addr=20 fc=0x03 -> FF
+junk addr=21 fc=0x03 -> FF
+junk addr=22 fc=0x03 -> FF
+junk addr=23 fc=0x03 -> FF
+junk addr=24 fc=0x03 -> FF
+junk addr=25 fc=0x03 -> FF
+junk addr=26 fc=0x03 -> FF
+junk addr=27 fc=0x03 -> FF
+junk addr=28 fc=0x03 -> FF
+junk addr=29 fc=0x03 -> FF
+junk addr=30 fc=0x03 -> FF
+junk addr=31 fc=0x03 -> FF
+junk addr=32 fc=0x03 -> FF
+# sweep done, 0 valid replies

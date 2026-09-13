@@ -1,0 +1,5 @@
+.DS_Store
+firmware/sniffer/secrets.py
+__pycache__/
+*.pyc
+.venv/

@@ -1,0 +1,331 @@
+<title>MRXBOX Sniffer Wiring</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #f2f5f6;
+    --surface: #ffffff;
+    --ink: #1d2733;
+    --muted: #5c6b78;
+    --line: #d3dbe0;
+    --warn-bg: #fdf3e4;
+    --warn-edge: #c77c1b;
+    --warn-ink: #6b4a12;
+    --w-a: #d97a00;
+    --w-b: #2f6fd0;
+    --w-pwr: #d43d2a;
+    --w-ro: #1f8a4c;
+    --w-gnd: #4a545e;
+    --w-future: #a3652f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #131a21;
+      --surface: #1a232c;
+      --ink: #e2e9ef;
+      --muted: #92a3b0;
+      --line: #2d3a45;
+      --warn-bg: #2b2214;
+      --warn-edge: #e09b3c;
+      --warn-ink: #eecf9b;
+      --w-a: #f5a13c;
+      --w-b: #6ea8ff;
+      --w-pwr: #ff6d55;
+      --w-ro: #46c47c;
+      --w-gnd: #b9c4cc;
+      --w-future: #d09a5e;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #131a21;
+    --surface: #1a232c;
+    --ink: #e2e9ef;
+    --muted: #92a3b0;
+    --line: #2d3a45;
+    --warn-bg: #2b2214;
+    --warn-edge: #e09b3c;
+    --warn-ink: #eecf9b;
+    --w-a: #f5a13c;
+    --w-b: #6ea8ff;
+    --w-pwr: #ff6d55;
+    --w-ro: #46c47c;
+    --w-gnd: #b9c4cc;
+    --w-future: #d09a5e;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.55;
+    margin: 0;
+    padding: 2.5rem 1.25rem 4rem;
+  }
+  main { max-width: 920px; margin: 0 auto; }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 0.5rem;
+  }
+  h1 {
+    font-size: clamp(1.6rem, 4vw, 2.2rem);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.35rem;
+    text-wrap: balance;
+  }
+  .subtitle { color: var(--muted); margin: 0 0 1.75rem; max-width: 62ch; }
+
+  .warnbar {
+    display: flex;
+    gap: 0.7rem;
+    align-items: baseline;
+    background: var(--warn-bg);
+    border-left: 4px solid var(--warn-edge);
+    color: var(--warn-ink);
+    border-radius: 6px;
+    padding: 0.8rem 1rem;
+    margin: 0 0 1.75rem;
+    font-size: 0.95rem;
+  }
+  .warnbar strong { font-weight: 600; }
+
+  figure {
+    margin: 0 0 2.25rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1.25rem 1rem 0.9rem;
+  }
+  .diagram-scroll { overflow-x: auto; }
+  .diagram-scroll svg {
+    display: block;
+    min-width: 720px;
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
+  }
+  figcaption {
+    font-size: 0.85rem;
+    color: var(--muted);
+    padding: 0.8rem 0.35rem 0.2rem;
+    max-width: 75ch;
+  }
+
+  h2 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    margin: 2.2rem 0 0.7rem;
+  }
+
+  .tablewrap { overflow-x: auto; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.92rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  th, td {
+    text-align: left;
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  th {
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  code, .mono {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.86em;
+  }
+  .swatch {
+    display: inline-block;
+    width: 0.85em;
+    height: 0.85em;
+    border-radius: 3px;
+    margin-right: 0.45em;
+    vertical-align: -0.08em;
+  }
+  ul { padding-left: 1.2rem; margin: 0.4rem 0 0; }
+  li { margin: 0.35rem 0; max-width: 72ch; }
+  li::marker { color: var(--muted); }
+  .footnote { color: var(--muted); font-size: 0.85rem; margin-top: 2.5rem; }
+</style>
+
+<main>
+  <p class="eyebrow">Nuaire MRXBOX ECO2 · Phase 1 · receive-only</p>
+  <h1>MRXBOX Sniffer Wiring</h1>
+  <p class="subtitle">Pico W + RS485 module tapped onto the MVHR display connector for bus sniffing. Five wires now, one dashed option for later.</p>
+
+  <div class="warnbar"><strong>Two rules before anything touches the unit:</strong>
+    <span>run the RS485 module at 3.3&nbsp;V (RP2040 pins are not 5&nbsp;V-tolerant), and identify all four MVHR pins with the meter before connecting a single wire — the 12&nbsp;V pin stays unconnected in this phase.</span>
+  </div>
+
+  <figure>
+    <div class="diagram-scroll">
+    <svg viewBox="0 0 960 650" role="img" aria-label="Wiring diagram: MVHR 4-pin connector to RS485 module (A, B, GND) and RS485 module to Pico W (RO to GP5, VCC to 3V3, GND to GND), with DE and RE tied to ground for receive-only operation and a dashed future 12-volt buck converter feed to VSYS.">
+      <!-- ============ blocks ============ -->
+      <g fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="40"  y="140" width="200" height="240" rx="8"/>
+        <rect x="430" y="130" width="180" height="300" rx="8"/>
+        <rect x="780" y="130" width="150" height="330" rx="8"/>
+        <rect x="255" y="480" width="150" height="58" rx="8" stroke-dasharray="6 5" stroke="var(--w-future)"/>
+      </g>
+
+      <!-- block titles -->
+      <g font-family="'IBM Plex Sans',sans-serif" font-weight="600" font-size="14" fill="currentColor">
+        <text x="140" y="165" text-anchor="middle">MVHR connector</text>
+        <text x="520" y="155" text-anchor="middle">RS485 module</text>
+        <text x="855" y="155" text-anchor="middle">Pico W</text>
+      </g>
+      <g font-family="'IBM Plex Mono',monospace" font-size="11" fill="var(--muted)">
+        <text x="140" y="182" text-anchor="middle">4-pin, order unknown —</text>
+        <text x="140" y="196" text-anchor="middle">assign roles with meter</text>
+        <text x="520" y="172" text-anchor="middle">MAX3485 @ 3.3V</text>
+        <text x="855" y="172" text-anchor="middle">RP2040</text>
+        <text x="330" y="502" text-anchor="middle" fill="var(--w-future)">12V→5V buck</text>
+        <text x="330" y="517" text-anchor="middle" fill="var(--w-future)">(future — not fitted)</text>
+      </g>
+
+      <!-- ============ MVHR -> module wires ============ -->
+      <!-- A -->
+      <line x1="240" y1="225" x2="422" y2="225" stroke="var(--w-a)" stroke-width="2.5"/>
+      <polygon points="420,220 430,225 420,230" fill="var(--w-a)"/>
+      <text x="335" y="216" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="12" fill="var(--w-a)">A — idles higher</text>
+      <!-- B -->
+      <line x1="240" y1="275" x2="422" y2="275" stroke="var(--w-b)" stroke-width="2.5"/>
+      <polygon points="420,270 430,275 420,280" fill="var(--w-b)"/>
+      <text x="335" y="266" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="12" fill="var(--w-b)">B — idles lower</text>
+      <!-- bus GND -->
+      <line x1="240" y1="325" x2="430" y2="325" stroke="var(--w-gnd)" stroke-width="2.5"/>
+      <text x="335" y="316" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="12" fill="var(--w-gnd)">bus GND</text>
+      <!-- 12V future -->
+      <path d="M240 355 H300 V480" fill="none" stroke="var(--w-future)" stroke-width="2" stroke-dasharray="6 5"/>
+      <path d="M405 510 H745 V445 H772" fill="none" stroke="var(--w-future)" stroke-width="2" stroke-dasharray="6 5"/>
+      <polygon points="770,440 780,445 770,450" fill="var(--w-future)"/>
+      <text x="250" y="372" font-family="'IBM Plex Mono',monospace" font-size="12" fill="var(--w-future)">12V — leave unconnected</text>
+      <text x="575" y="500" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="12" fill="var(--w-future)">future: power Pico from unit → VSYS</text>
+
+      <!-- MVHR pin dots -->
+      <g fill="currentColor">
+        <circle cx="240" cy="225" r="3.5"/>
+        <circle cx="240" cy="275" r="3.5"/>
+        <circle cx="240" cy="325" r="3.5"/>
+        <circle cx="240" cy="355" r="3.5"/>
+      </g>
+
+      <!-- ============ module pins ============ -->
+      <g font-family="'IBM Plex Mono',monospace" font-size="12" fill="currentColor">
+        <text x="440" y="229">A</text>
+        <text x="440" y="279">B</text>
+        <text x="440" y="329">GND</text>
+        <text x="600" y="204" text-anchor="end">RO</text>
+        <text x="600" y="249" text-anchor="end">R̄Ē</text>
+        <text x="600" y="294" text-anchor="end">DE</text>
+        <text x="600" y="339" text-anchor="end">DI</text>
+        <text x="600" y="384" text-anchor="end">VCC</text>
+        <text x="600" y="419" text-anchor="end">GND</text>
+      </g>
+
+      <!-- ============ module -> pico wires ============ -->
+      <!-- RO -> GP5 -->
+      <line x1="610" y1="200" x2="772" y2="200" stroke="var(--w-ro)" stroke-width="2.5"/>
+      <polygon points="770,195 780,200 770,205" fill="var(--w-ro)"/>
+      <text x="695" y="191" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="12" fill="var(--w-ro)">data out</text>
+      <!-- RE + DE tie-low -->
+      <path d="M610 245 H660 V415" fill="none" stroke="var(--w-gnd)" stroke-width="2"/>
+      <line x1="610" y1="290" x2="660" y2="290" stroke="var(--w-gnd)" stroke-width="2"/>
+      <circle cx="660" cy="290" r="3.5" fill="var(--w-gnd)"/>
+      <circle cx="660" cy="415" r="3.5" fill="var(--w-gnd)"/>
+      <text x="672" y="330" font-family="'IBM Plex Mono',monospace" font-size="11" fill="var(--w-gnd)">tie low =</text>
+      <text x="672" y="344" font-family="'IBM Plex Mono',monospace" font-size="11" fill="var(--w-gnd)">receive-only</text>
+      <!-- DI n/c -->
+      <line x1="610" y1="335" x2="635" y2="335" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 4"/>
+      <text x="642" y="339" font-family="'IBM Plex Mono',monospace" font-size="11" fill="var(--muted)">n/c</text>
+      <!-- VCC -> 3V3 -->
+      <line x1="610" y1="380" x2="772" y2="380" stroke="var(--w-pwr)" stroke-width="2.5"/>
+      <polygon points="770,375 780,380 770,385" fill="var(--w-pwr)"/>
+      <text x="695" y="371" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="12" fill="var(--w-pwr)">3.3V only</text>
+      <!-- GND -> GND -->
+      <line x1="610" y1="415" x2="780" y2="415" stroke="var(--w-gnd)" stroke-width="2.5"/>
+
+      <!-- module pin dots -->
+      <g fill="currentColor">
+        <circle cx="610" cy="200" r="3.5"/>
+        <circle cx="610" cy="245" r="3.5"/>
+        <circle cx="610" cy="290" r="3.5"/>
+        <circle cx="610" cy="335" r="3.5"/>
+        <circle cx="610" cy="380" r="3.5"/>
+        <circle cx="610" cy="415" r="3.5"/>
+      </g>
+
+      <!-- ============ pico pins ============ -->
+      <g font-family="'IBM Plex Mono',monospace" font-size="12" fill="currentColor">
+        <text x="790" y="204">GP5 · pin 7</text>
+        <text x="790" y="384">3V3 · pin 36</text>
+        <text x="790" y="419">GND · pin 38</text>
+        <text x="790" y="449" fill="var(--w-future)">VSYS · pin 39</text>
+      </g>
+      <g fill="currentColor">
+        <circle cx="780" cy="200" r="3.5"/>
+        <circle cx="780" cy="380" r="3.5"/>
+        <circle cx="780" cy="415" r="3.5"/>
+      </g>
+      <circle cx="780" cy="445" r="3.5" fill="var(--w-future)"/>
+      <g font-family="'IBM Plex Mono',monospace" font-size="11" fill="var(--muted)">
+        <text x="790" y="219">UART1 RX</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption>Receive-only tap: the RS485 pair lands on the module's A/B, the module's RO feeds the Pico's UART1 RX on GP5, and DE + R̄Ē tied to ground keep the driver permanently off so nothing can transmit onto the bus. Solid wires are this build; the dashed 12&nbsp;V → buck → VSYS run is the later self-powered option.</figcaption>
+  </figure>
+
+  <h2>Connections</h2>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Wire</th><th>From</th><th>To</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td><span class="swatch" style="background:var(--w-a)"></span>A</td><td>MVHR pin (idles higher)</td><td>Module <code>A</code></td><td>Confirm with meter: higher idle voltage of the two data lines</td></tr>
+      <tr><td><span class="swatch" style="background:var(--w-b)"></span>B</td><td>MVHR pin (idles lower)</td><td>Module <code>B</code></td><td>If first captures are garbage at every baud, swap A/B</td></tr>
+      <tr><td><span class="swatch" style="background:var(--w-gnd)"></span>GND</td><td>MVHR 0&nbsp;V pin</td><td>Module <code>GND</code> + Pico pin 38</td><td>One common ground — the only connection shared with the unit besides A/B</td></tr>
+      <tr><td><span class="swatch" style="background:var(--w-ro)"></span>Data</td><td>Module <code>RO</code></td><td>Pico <code>GP5</code> (pin 7)</td><td>UART1 RX — matches <code>RX_PIN = 5</code> in the sniffer firmware</td></tr>
+      <tr><td><span class="swatch" style="background:var(--w-pwr)"></span>Power</td><td>Pico <code>3V3</code> (pin 36)</td><td>Module <code>VCC</code></td><td>3.3&nbsp;V only. A 5&nbsp;V-fed module puts ~5&nbsp;V on RO and can kill the RP2040 pin</td></tr>
+      <tr><td>Jumper</td><td>Module <code>DE</code> + <code>R̄Ē</code></td><td>Module <code>GND</code></td><td>Driver off, receiver on — the tap physically cannot transmit</td></tr>
+      <tr><td>—</td><td>Module <code>DI</code></td><td>nothing</td><td>Unused until the write-back phase</td></tr>
+      <tr><td><span class="swatch" style="background:var(--w-future)"></span>12&nbsp;V</td><td>MVHR 12&nbsp;V pin</td><td>nothing (later: buck → VSYS pin 39)</td><td>Cap it off for now. Never to VSYS directly — 5.5&nbsp;V max</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Identifying the four MVHR pins</h2>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Pin</th><th>Meter signature (DC to GND)</th></tr></thead>
+    <tbody>
+      <tr><td>GND</td><td>0&nbsp;V, rock steady. Find first: probe pin pairs until one reads a steady 12&nbsp;V — the lower pin of that pair is GND</td></tr>
+      <tr><td>12&nbsp;V</td><td>Steady ~12&nbsp;V, no flicker</td></tr>
+      <tr><td>A</td><td>Idle ~1.5–3.3&nbsp;V, the <em>higher</em> of the two data lines; flickers with traffic</td></tr>
+      <tr><td>B</td><td>Idle lower than A (often 0.5–1.5&nbsp;V); flickers with traffic</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <ul>
+    <li>Getting GND right matters most — tying the unit's 12&nbsp;V rail to Pico ground shorts it through USB and can damage the unit's PSU.</li>
+    <li>Both data lines steady at ~0&nbsp;V usually means the bus is just quiet — wait 30&nbsp;s+, sensors poll infrequently.</li>
+    <li>Cheap modules often carry a 120&nbsp;Ω termination resistor. If reception looks corrupted on a bus that already has termination, remove it. Keep the tap stub under ~30&nbsp;cm.</li>
+  </ul>
+
+  <p class="footnote">Companion to <code>docs/hardware.md</code> in the nuaire repo — that file holds the safety procedure (isolate the unit before opening) and the full pin-identification walkthrough. Firmware expects GP5 / UART1 RX; capture with <code>nc &lt;pico-ip&gt; 9000</code>.</p>
+</main>
