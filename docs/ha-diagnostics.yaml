@@ -1,0 +1,103 @@
+# Method A: Home Assistant diagnostic sensors for every raw MRXBOX frame byte.
+# Paste under the top-level `mqtt:` key in configuration.yaml (merge if you
+# already have one), then restart HA. All are entity_category: diagnostic so
+# they stay out of the main dashboard. Use Settings > ... > History to overlay
+# each against Met.no outdoor temp / time-of-day / humidity to decode fields.
+mqtt:
+  sensor:
+    - name: "MRXBOX raw 11_1"
+      state_topic: "nuaire/raw"
+      value_template: "{{ value.split(',')[0] | int }}"
+      unique_id: "nuaire_raw_11_1"
+      entity_category: diagnostic
+      state_class: measurement
+    - name: "MRXBOX raw 11_2"
+      state_topic: "nuaire/raw"
+      value_template: "{{ value.split(',')[1] | int }}"
+      unique_id: "nuaire_raw_11_2"
+      entity_category: diagnostic
+      state_class: measurement
+    - name: "MRXBOX raw 21_1"
+      state_topic: "nuaire/raw"
+      value_template: "{{ value.split(',')[2] | int }}"
+      unique_id: "nuaire_raw_21_1"
+      entity_category: diagnostic
+      state_class: measurement
+    - name: "MRXBOX raw 21_2"   # boost/fan (bit 0x02) - known
+      state_topic: "nuaire/raw"
+      value_template: "{{ value.split(',')[3] | int }}"
+      unique_id: "nuaire_raw_21_2"
+      entity_category: diagnostic
+      state_class: measurement
+    - name: "MRXBOX raw 21_3"
+      state_topic: "nuaire/raw"
+      value_template: "{{ value.split(',')[4] | int }}"
+      unique_id: "nuaire_raw_21_3"
+      entity_category: diagnostic
+      state_class: measurement
+    - name: "MRXBOX raw 31_3"
+      state_topic: "nuaire/raw"
+      value_template: "{{ value.split(',')[5] | int }}"
+      unique_id: "nuaire_raw_31_3"
+      entity_category: diagnostic
+      state_class: measurement
+    - name: "MRXBOX raw 33_3"   # was mis-IDd as temp (constant)
+      state_topic: "nuaire/raw"
+      value_template: "{{ value.split(',')[6] | int }}"
+      unique_id: "nuaire_raw_33_3"
+      entity_category: diagnostic
+      state_class: measurement
+    - name: "MRXBOX raw 3B_1"   # humidity % - known
+      state_topic: "nuaire/raw"
+      value_template: "{{ value.split(',')[7] | int }}"
+      unique_id: "nuaire_raw_3B_1"
+      entity_category: diagnostic
+      state_class: measurement
+    - name: "MRXBOX raw 3B_2"
+      state_topic: "nuaire/raw"
+      value_template: "{{ value.split(',')[8] | int }}"
+      unique_id: "nuaire_raw_3B_2"
+      entity_category: diagnostic
+      state_class: measurement
+    - name: "MRXBOX raw 3B_3"
+      state_topic: "nuaire/raw"
+      value_template: "{{ value.split(',')[9] | int }}"
+      unique_id: "nuaire_raw_3B_3"
+      entity_category: diagnostic
+      state_class: measurement
+    - name: "MRXBOX raw 51_4"
+      state_topic: "nuaire/raw"
+      value_template: "{{ value.split(',')[10] | int }}"
+      unique_id: "nuaire_raw_51_4"
+      entity_category: diagnostic
+      state_class: measurement
+    - name: "MRXBOX raw 75_5"
+      state_topic: "nuaire/raw"
+      value_template: "{{ value.split(',')[11] | int }}"
+      unique_id: "nuaire_raw_75_5"
+      entity_category: diagnostic
+      state_class: measurement
+    - name: "MRXBOX raw 85_1"
+      state_topic: "nuaire/raw"
+      value_template: "{{ value.split(',')[12] | int }}"
+      unique_id: "nuaire_raw_85_1"
+      entity_category: diagnostic
+      state_class: measurement
+    - name: "MRXBOX raw 85_3"
+      state_topic: "nuaire/raw"
+      value_template: "{{ value.split(',')[13] | int }}"
+      unique_id: "nuaire_raw_85_3"
+      entity_category: diagnostic
+      state_class: measurement
+    - name: "MRXBOX raw 85_6"
+      state_topic: "nuaire/raw"
+      value_template: "{{ value.split(',')[14] | int }}"
+      unique_id: "nuaire_raw_85_6"
+      entity_category: diagnostic
+      state_class: measurement
+    - name: "MRXBOX raw A3_7"
+      state_topic: "nuaire/raw"
+      value_template: "{{ value.split(',')[15] | int }}"
+      unique_id: "nuaire_raw_A3_7"
+      entity_category: diagnostic
+      state_class: measurement

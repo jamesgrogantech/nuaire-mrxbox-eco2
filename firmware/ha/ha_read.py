@@ -58,10 +58,20 @@ def connect():
 c = connect()
 u = UART(1, baudrate=1200, bits=8, parity=None, stop=1, rx=Pin(5), timeout=0, rxbuf=1024)
 buf = bytearray(); vals = {'humidity': None, 'boost': None}
+# gap-split message assembler for the raw-frame log (additive; the anchored
+# humidity/boost decode above is untouched). frame[header] = list of raw bytes.
+mbuf = bytearray(); mlast = time.ticks_us(); frame = {}
+# fixed order of (header, byte-index) to emit as nuaire/raw (bit-reversed).
+# Covers every non-padding data byte across the 9 messages, so long-term
+# logging can correlate any of them. -1 if that message is absent this cycle.
+RAWMAP = ((0x11,1),(0x11,2),(0x21,1),(0x21,2),(0x21,3),(0x31,3),(0x33,3),
+          (0x3B,1),(0x3B,2),(0x3B,3),(0x51,4),(0x75,5),(0x85,1),(0x85,3),
+          (0x85,6),(0xA3,7))
 lastpub = time.ticks_ms(); fails = 0
 
 while True:
     d = u.read()
+    now = time.ticks_us()
     if d:
         buf.extend(d)
         if len(buf) > 400: buf = bytearray(buf[-200:])
@@ -70,11 +80,21 @@ while True:
                 v = rev(buf[i+1]); vals['humidity'] = v if 0 <= v <= 100 else vals['humidity']
             elif buf[i] == 0x21 and buf[i+1] == 0xAA:
                 vals['boost'] = 'ON' if (buf[i+2] & 0x02) == 0 else 'OFF'
+        if mbuf and time.ticks_diff(now, mlast) > 15000:
+            frame[mbuf[0]] = list(mbuf); mbuf = bytearray()
+        mbuf.extend(d); mlast = now
+    elif mbuf and time.ticks_diff(now, mlast) > 15000:
+        frame[mbuf[0]] = list(mbuf); mbuf = bytearray()
     if time.ticks_diff(time.ticks_ms(), lastpub) >= 15000:
         try:
             for k in vals:
                 if vals[k] is not None:
                     c.publish('nuaire/'+k, str(vals[k]), retain=True)
+            raw = []
+            for h, pos in RAWMAP:
+                m = frame.get(h)
+                raw.append(str(rev(m[pos])) if m and len(m) > pos else '-1')
+            c.publish('nuaire/raw', ','.join(raw), retain=True)
             c.ping()
             fails = 0
         except Exception:
