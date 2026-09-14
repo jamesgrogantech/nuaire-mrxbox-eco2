@@ -29,7 +29,11 @@ def rev(b):
 w = network.WLAN(network.STA_IF); w.active(True)
 try: w.config(pm=0xa11140)
 except: pass
-try: w.ifconfig(('192.168.0.90','255.255.255.0','192.168.0.1','192.168.0.1'))
+# static IP is optional: set STATIC_IP = (ip, mask, gw, dns) in secrets.py to
+# pin one, or leave it None (default) for DHCP. See secrets.example.py.
+try:
+    _ip = getattr(secrets, 'STATIC_IP', None)
+    if _ip: w.ifconfig(_ip)
 except: pass
 w.connect(secrets.WIFI_SSID, secrets.WIFI_PASS)
 # WDT armed here so a hang anywhere past this point self-heals. 8388ms = RP2040

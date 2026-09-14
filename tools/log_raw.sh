@@ -4,15 +4,21 @@
 # Needs only the mosquitto clients (mosquitto_sub). Run on any always-on box:
 # the HA host (SSH/Terminal add-on), a spare Pi, or a laptop left running.
 #
-#   ./log_raw.sh 192.168.0.54 pico your-mqtt-pass /path/to/nuaire_raw.csv
+#   ./log_raw.sh <broker_host> <mqtt_user> <mqtt_pass> [csv_path]
+#   ./log_raw.sh 192.168.1.10 pico 'your-mqtt-pass' ~/nuaire_raw.csv
 #
 # Runs forever; safe to Ctrl-C and restart (appends). Leave it going for days,
 # then feed the CSV to tools/analyze_longterm.py.
 
-HOST="${1:-192.168.0.54}"
-USER="${2:-pico}"
-PASS="${3:-your-mqtt-pass}"
+HOST="$1"
+USER="$2"
+PASS="$3"
 CSV="${4:-nuaire_raw.csv}"
+
+if [ -z "$HOST" ] || [ -z "$USER" ] || [ -z "$PASS" ]; then
+  echo "usage: $0 <broker_host> <mqtt_user> <mqtt_pass> [csv_path]" >&2
+  exit 2
+fi
 
 # column labels match RAWMAP order in firmware/ha/ha_read.py
 HDR="unixtime,11_1,11_2,21_1,21_2,21_3,31_3,33_3,3B_1,3B_2,3B_3,51_4,75_5,85_1,85_3,85_6,A3_7"

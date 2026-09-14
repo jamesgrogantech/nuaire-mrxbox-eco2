@@ -34,7 +34,7 @@ Done via **MQTT auto-discovery**, so no `configuration.yaml` edit and no add-on
 
 1. One-time: publish the 16 diagnostic sensors as retained discovery configs:
    ```
-   python3 tools/publish_raw_discovery.py 192.168.0.54 pico <mqtt_pass>
+   python3 tools/publish_raw_discovery.py 192.168.1.10 pico <mqtt_pass>
    ```
    HA auto-creates `sensor.nuaire_mrxbox_eco2_mrxbox_raw_*` (grouped under the
    MRXBOX device, entity_category diagnostic) and the recorder logs their
@@ -54,7 +54,7 @@ temp; the intake byte should track outdoor (Met.no). Strong decode leverage.
 1. Run the logger on any always-on box (HA SSH/Terminal add-on, a spare Pi, or
    a laptop). Needs only the mosquitto clients:
    ```
-   ./tools/log_raw.sh 192.168.0.54 pico your-mqtt-pass ~/nuaire_raw.csv
+   ./tools/log_raw.sh 192.168.1.10 pico your-mqtt-pass ~/nuaire_raw.csv
    ```
    Leave it running for days (safe to stop/restart — it appends).
 2. Analyse (stdlib only; add lat/lon for an open-meteo outdoor-temp pull):

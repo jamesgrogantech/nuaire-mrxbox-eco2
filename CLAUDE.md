@@ -23,7 +23,7 @@ protocol is understood.
   the RS485 module must run at 3.3V (or divider on RO), see docs/hardware.md
 - Board is flashed and headless-ready: netsniff.py installed as main.py, joins
   WiFi on power-up, serves captures on TCP :9000 (DHCP — reserve the IP in the
-  router; was 192.168.0.84 on 2026-08-25)
+  router; reserve the DHCP lease in your router for a stable address)
 - Test gear: multimeter only (logic analyser deferred until needed)
 - Baud rate, framing, pinout: **unknown** — nothing published
 

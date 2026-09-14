@@ -12,8 +12,8 @@ to its config topic (see --clear).
 
 Column order matches RAWMAP in firmware/ha/ha_read.py.
 
-  python3 tools/publish_raw_discovery.py 192.168.0.54 pico <password>
-  python3 tools/publish_raw_discovery.py 192.168.0.54 pico <password> --clear
+  python3 tools/publish_raw_discovery.py 192.168.1.10 pico <password>
+  python3 tools/publish_raw_discovery.py 192.168.1.10 pico <password> --clear
 """
 import json
 import subprocess

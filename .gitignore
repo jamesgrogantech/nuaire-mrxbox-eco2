@@ -3,3 +3,6 @@ firmware/sniffer/secrets.py
 __pycache__/
 *.pyc
 .venv/
+
+# long-term logger output
+nuaire_raw.csv
