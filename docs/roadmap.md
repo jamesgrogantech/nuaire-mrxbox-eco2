@@ -23,7 +23,8 @@ temp sensors, but none of it is broadcast — the display **polls** the unit for
 it. To read it we must reproduce that poll.
 - [ ] **MITM a real MRXBOX-VSC** (borrow/buy): tap the bus between VSC and unit,
       capture the display's poll request + the unit's response containing temps.
-      This is the reliable route.
+      This is the reliable route. **Step-by-step guide: [docs/vsc-mitm.md](vsc-mitm.md)**
+      (Waveshare ESP32-S3-RS485-CAN + firmware/esp32-s3/vsc_capture.py).
 - [ ] From the capture: identify the poll frame, then transmit it ourselves and
       read the reply (moves us from receive-only to active polling).
 - [ ] (Low odds without a reference) blind-fuzz poll candidates — Modbus already

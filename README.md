@@ -128,6 +128,7 @@ out what the unknown bytes mean — see [`docs/longterm-logging.md`](docs/longte
 | [`docs/protocol.md`](docs/protocol.md) | Living protocol findings (the important one) |
 | [`docs/hardware.md`](docs/hardware.md) | Safety, pin identification, wiring |
 | [`docs/longterm-logging.md`](docs/longterm-logging.md) | Decoding the remaining frame bytes |
+| [`docs/vsc-mitm.md`](docs/vsc-mitm.md) | **Have a VSC display? Capture the temperatures** (MITM guide) |
 | [`docs/roadmap.md`](docs/roadmap.md) | Phased plan + next steps |
 | [`docs/prior-art.md`](docs/prior-art.md) | Other people's Nuaire work |
 | [`firmware/ha/ha_read.py`](firmware/ha/ha_read.py) | Pico W → HA MQTT bridge (production) |
@@ -141,7 +142,11 @@ out what the unknown bytes mean — see [`docs/longterm-logging.md`](docs/longte
 
 Contributions are very welcome — especially **other units** (does an MRXBOX ECO2
 vary? do MRXBOXAB / other Nuaire models speak the same bus?) and **other
-hardware** (an ESPHome port is the big one). Please read
+hardware** (an ESPHome port is the big one).
+
+**Have the MRXBOX-VSC display?** You can help unlock the temperatures — they're
+polled by the display, not broadcast, so a capture from a bus with a real VSC on
+it is the missing piece. Follow [docs/vsc-mitm.md](docs/vsc-mitm.md). Please read
 [CONTRIBUTING.md](CONTRIBUTING.md): it covers the receive-only safety rule, the
 capture-naming and "confirmed needs two captures" conventions, and how to report
 your hardware/unit.
