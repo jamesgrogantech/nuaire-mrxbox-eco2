@@ -1,0 +1,24 @@
+# Nuaire MRXBOX ECO2 — FULL broadcast frame, every byte (1200 8N1)
+# Captured 2026-09-15 via firmware/sniffer full_dump over UART1 @1200 on GP5.
+# Proves the autonomous broadcast = the 9 known messages only, and every
+# non-mapped byte is 0xFE (bit-reversed 127) padding. No temperature byte.
+# See docs/protocol.md "Temperatures are NOT broadcast — POLL-ONLY".
+# Format: H<hdr> L<len> | raw <hex bytes> | rev <bit-reversed decimals>
+# (first rev value is the header reversed — ignore it)
+
+--- burst (one full cycle, ~0.7s; identical across all captured cycles) ---
+H21 L4 | raw 21 AA F6 D6          | rev 132 85 111 107
+H11 L3 | raw 11 F6 4C             | rev 136 111 50
+H51 L5 | raw 51 FE FE FE 04       | rev 138 127 127 127 32
+H31 L4 | raw 31 FE FE 9A          | rev 140 127 127 89
+H33 L4 | raw 33 FE FE 98          | rev 204 127 127 25
+H85 L7 | raw 85 2A FE 2E FE FE D4 | rev 161 84 127 116 127 127 43
+HA3 L8 | raw A3 FE FE FE FE FE FE 08 | rev 197 127 127 127 127 127 127 16
+H75 L6 | raw 75 FE FE FE FE DE    | rev 174 127 127 127 127 123
+H3B L4 | raw 3B 62 54 A6          | rev 220 70 42 101
+
+# Data bytes (bit-reversed, header excluded), all mapped in RAWMAP:
+#   21: 85, 111(boost=OFF), 107        31: 89           A3: 16
+#   11: 111, 50                        33: 25           75: 123
+#   51: 32                             85: 84,116,43    3B: 70(hum), 42, 101
+# Every other slot = 127 (0xFE) padding. Boost was OFF, humidity ~70% at capture.

@@ -204,6 +204,53 @@ reading (bit-smeared) ~0x7C dry / ~0x80 humid. Also 0x70 fell 6.0%→1.8% and
 stayed (possible related field or humidity auto-boost threshold).
 Once clean-decoded: map the byte to actual RH%.
 
+### Fan / mode — `85` message — HYPOTHESIS (2026-09-15)
+The `85` message (`85 2A FE 2E FE FE D4`, positions 85_1/85_3/85_6 bit-reversed)
+is the only *varying* non-humidity data in the broadcast. Over 50 h it steps
+between a small discrete set (85_1 in {12,52,76,84,116}) at intervals of hours,
+sometimes within an hour. Evidence it is a **fan speed / operating mode**, not a
+sensor value:
+- Discrete levels, revisited across days — not a continuum.
+- Switches faster than any thermal mass could (rules out temperature; see below).
+- `85_1 = 84` appeared only during the highest humidity (71 %), hinting the unit
+  modulates airflow with humidity demand (this is a demand-controlled MVHR:
+  manual gives speeds SPD1 20% / SPD2 50% / SPD3 100%, supply + extract).
+NOT yet mapped to specific speeds — needs a stimulus (change speed / shower) with
+a live watch to pin values to 20/50/100 %. Note: an earlier "arithmetic step-2"
+reading of these bytes was a bit-order error (double bit-reversal); the true
+values are the sensor values above.
+
+### Temperatures are NOT broadcast — they are POLL-ONLY — CONFIRMED (2026-09-15)
+The MRXBOX-VSC controller **does** show Outside + Average-Indoor temperature, and
+the unit has an Extract and a Supply temperature sensor (VSC manual §4.1, §9,
+docs/img or Downloads). But the temperatures are **not present in the unit's
+autonomous broadcast**. Three independent lines of evidence:
+1. **Full frame captured** (firmware/sniffer full_dump over UART, 2026-09-15):
+   the broadcast is exactly the 9 known messages and **every non-mapped byte is
+   `0xFE` padding** (bit-reversed 127). There is no hidden data byte. Complete
+   frame, data bytes bit-reversed:
+   ```
+   21: 85, boost, boost-mirror      31: 89        A3: 16
+   11: 111, 50                      33: 25        75: 123
+   51: 32                           85: 84, 116, 43 (fan/mode)   3B: hum, 42, 3b_3
+   ```
+2. **50 h of logging**: no byte tracked the outdoor swing (13→24 °C, two nights).
+3. **The unit clearly has the data** (sensors + display), so the display must
+   obtain it by **polling** the unit (request/response) — which we have never
+   seen, having never had a display on the bus. Matches the "display is bus
+   master" hypothesis in Bus roles below.
+Implication: reading temperatures (and likely the run-time counters / richer
+diagnostics) requires either **MITM-sniffing a real MRXBOX-VSC** to capture the
+poll + response, or discovering the poll command by fuzzing (Modbus already
+returned nothing — the poll is proprietary). See docs/roadmap.md.
+Caveat: the full-frame scan was ~20 s (USB too flaky for minutes), so a temp
+message broadcast *rarer* than ~20 s is unlikely but not fully excluded; a
+headless full-frame logger would close this.
+Lingering candidate: `33_3` is a stable `25` and *could* be a broadcast
+indoor/extract temp that simply doesn't move (indoor ~22–25 °C all week). The
+earlier warm-the-extract test didn't move it (retracted above), but may not have
+reached the sensor — worth one more strong stimulus test.
+
 _Template for full field entries once decoded:_
 
 ### <field name>  — <STATUS>

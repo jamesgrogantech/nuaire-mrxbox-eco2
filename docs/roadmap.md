@@ -1,51 +1,55 @@
 # Roadmap
 
-## Phase 1 — bus discovery (current)
-- [ ] Isolate unit, open, photograph PCB + connectors (→ docs/img/)
-- [ ] Trace connector pins to WS3471 with continuity (power off) → pinout in
-      docs/hardware.md
-- [ ] Powered voltage survey of candidate pins (≤12V expected)
-- [ ] Wire MAX485 receive-only per docs/hardware.md
-- [ ] Run firmware/sniffer/baudfind.py — pulse-width histogram → baud rate
-- [ ] Run firmware/sniffer/main.py at discovered baud → first capture in
-      captures/
-- [ ] Milestone: clean, repeating byte stream captured; baud CONFIRMED in
-      docs/protocol.md
+## Phase 1 — bus discovery ✅ DONE
+- [x] Trace connector pins, confirm live RS485 bus (unit-biased, A>B, meter)
+- [x] Baud/framing: **1200 8N1**, data **MSB-first** (bit-reverse each data byte)
+- [x] Clean, repeating capture of the unit's autonomous broadcast
+- Note: the 3.3 V Pico transceiver under-reads the weakly-biased bus; a 5 V
+  transceiver/dongle reads it reliably. See docs/protocol.md.
 
-## Phase 1.5 — get the unit to actually reply (current)
-What's confirmed (2026-08-27): the display connector is a live RS485 bus,
-unit-biased, A>B, correct polarity, our pin ID right (meter check). What
-fails: no reply to Modbus polling. Leading cause: our 3.3V MAX485 under-drives
-the differential — the unit never receives a clean poll. Our own self-echo
-masks this (local, always works).
+## Phase 2 — protocol decode ✅ (broadcast fully mapped)
+- [x] Frame = 9 gap-separated messages, ~0.7 s repeat (21 11 51 31 33 85 A3 75 3B)
+- [x] **Humidity** decoded + confirmed (3B byte1, bit-reversed = RH %)
+- [x] **Boost/fan** decoded + confirmed (21 byte2 bit 0x02; verified via bit-rev)
+- [x] Full frame captured: every non-mapped byte is padding — the broadcast
+      carries nothing else. All 16 candidate bytes logged long-term.
+- [~] `85` message = fan speed / mode (HYPOTHESIS) — needs a speed/shower stimulus
+- [x] **Temperatures are NOT in the broadcast — poll-only** (see below). No
+      temperature or run-time counter is obtainable passively.
 
-- [x] Confirm connector is live RS485 (meter)
-- [x] Rule out reversed A/B (software UART inversion)
-- [x] Rule out module fault (A/B = 120Ω terminator, not a short)
-- [ ] **USB-RS485 dongle** (Waveshare, SP485EEN, 5V, auto-direction) — on order
-- [ ] Laptop tooling: install `mbpoll` (brew) + a pymodbus scanner script
-- [ ] When it lands: wire A+/B-/GND to connector, then
-      1. passive listen at each baud for spontaneous traffic
-      2. `mbpoll` address+baud sweep, read function codes only
-      3. if silent, swap A/B screw terminals, retry
-- [ ] If still silent with proper 5V drive: unit likely needs a real display
-      to poll it → borrow/buy MRXBOX-VSC and MITM sniff (Option C)
-- [ ] Milestone: one genuine, CRC-valid frame the UNIT generated
+## Phase 2b — get the polled data (temperatures, counters, diagnostics)
+The VSC display shows Outside + Indoor temp and the unit has Extract + Supply
+temp sensors, but none of it is broadcast — the display **polls** the unit for
+it. To read it we must reproduce that poll.
+- [ ] **MITM a real MRXBOX-VSC** (borrow/buy): tap the bus between VSC and unit,
+      capture the display's poll request + the unit's response containing temps.
+      This is the reliable route.
+- [ ] From the capture: identify the poll frame, then transmit it ourselves and
+      read the reply (moves us from receive-only to active polling).
+- [ ] (Low odds without a reference) blind-fuzz poll candidates — Modbus already
+      returned nothing, so the poll is proprietary.
+- [ ] Optional: headless full-frame logger (small firmware add) to 100 % exclude
+      a rarely-broadcast temp message.
+- [ ] One more `33_3` stimulus test (strongly warm the extract, watch live) — it
+      is a stable `25` and might be a broadcast indoor temp after all.
 
-## Phase 2 — protocol decode
-- [ ] tools/analyze.py over captures: frame split, checksum hunt
-- [ ] Correlate fields with physical reality (breathe on RH sensor, change
-      speed via switched-live/relay inputs, note RPM changes)
-- [ ] Milestone: temp/RH/fan state decoded and CONFIRMED
+## Phase 3 — write-back / control (gated — see docs/protocol.md preconditions)
+Requires transmitting onto the bus. Preconditions: framing + checksum confirmed,
+a genuine command frame captured from a real VSC (see Phase 2b MITM), replay plan
+written and reviewed. Receive-only until then.
+- [ ] Understand the command format (from the VSC MITM capture)
+- [ ] Replay a single captured command (e.g. speed change), observe, revert
+- [ ] Milestone: fan speed / boost set from the Pico
 
-## Phase 3 — write-back (gated — see docs/protocol.md preconditions)
-- [ ] Understand master/slave vs broadcast
-- [ ] Replay a single captured command frame, observe unit, revert
-- [ ] Milestone: speed change via Pico
+## Phase 4 — Home Assistant ✅ (read-only live) / ongoing
+- [x] Headless Pico W → MQTT bridge with HA auto-discovery, self-healing
+      (watchdog + broker-liveness reset for the CYW43 zombie-WiFi failure mode)
+- [x] Live entities: **humidity**, **boost**; all 16 raw bytes on `nuaire/raw`
+      for long-term decoding (16 diagnostic sensors via MQTT discovery)
+- [ ] Add fan speed/mode once `85` is confirmed
+- [ ] Add temperatures once Phase 2b lands
+- [ ] Add controls (speed, boost) once Phase 3 lands
 
-## Phase 4 — Home Assistant
-- Route TBD (MQTT over WiFi is the default assumption: Pico 2W → broker →
-  MQTT discovery entities)
-- [ ] Continuous-read firmware with reconnect/watchdog
-- [ ] HA entities: temps, RH, fan speed/RPM, filter/diag flags
-- [ ] Controls: speed select, boost
+## Community / repo
+- [x] Public repo (MIT), README + CONTRIBUTING + issue/PR templates
+- [ ] Gather other-unit / other-hardware reports (ESP32/ESPHome port wanted)
