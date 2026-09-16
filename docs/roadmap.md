@@ -27,15 +27,23 @@ it. To read it we must reproduce that poll.
       (Waveshare ESP32-S3-RS485-CAN + firmware/esp32-s3/vsc_capture.py).
 - [ ] From the capture: identify the poll frame, then transmit it ourselves and
       read the reply (moves us from receive-only to active polling).
-- [ ] (Low odds without a reference) blind-fuzz poll candidates — Modbus already
-      returned nothing, so the poll is proprietary.
+- [ ] Cheaper talkers than a VSC: **MRXBOX95-HUM / -PIR** send an enable/boost
+      demand on the same Ecosmart NET bus; **ES-LCD** has its firmware on a
+      removable SD card. See docs/command-research.md §5.2.
+- [ ] Receive-only prep: per-message µs timestamps (reply-slot / poll-pair
+      hunt), attribute headers to talkers by unplugging the internal RH sensor,
+      byte-level logging for bare-byte ACKs. docs/command-research.md §5.1.
+- [ ] (Low odds without a reference) structured probes using the unit's own
+      envelope + confirmed XOR check — docs/command-research.md §5.3. Modbus
+      already returned nothing, so the poll is proprietary.
 - [ ] Optional: headless full-frame logger (small firmware add) to 100 % exclude
       a rarely-broadcast temp message.
 - [ ] One more `33_3` stimulus test (strongly warm the extract, watch live) — it
       is a stable `25` and might be a broadcast indoor temp after all.
 
 ## Phase 3 — write-back / control (gated — see docs/protocol.md preconditions)
-Requires transmitting onto the bus. Preconditions: framing + checksum confirmed,
+Requires transmitting onto the bus. Preconditions: framing + checksum confirmed
+(**both done 2026-09-16**: 7-bit payload with header flag, XOR check = 0xAB raw),
 a genuine command frame captured from a real VSC (see Phase 2b MITM), replay plan
 written and reviewed. Receive-only until then.
 - [ ] Understand the command format (from the VSC MITM capture)

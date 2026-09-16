@@ -24,8 +24,28 @@ Summary (as of 2026-08-25):
 - Official VSC wired controller exists (expensive) — candidate purchase for
   Phase 2 command sniffing if sensor-bus RE stalls
 
+## 2026-09-16 research sweep — see docs/command-research.md for the synthesis
+- HA thread re-read in full (14 posts to 2026-09-14). Two members own a
+  display: abinitio1980 (2023, "cheap display from eBay … EcoSmart Classic
+  bus", reported +15 V / 0 V / Data+ / Data−) and MNeverOff (2026-08, working
+  VSC; ordered a Waveshare ESP32-S3-RS485-CAN 2026-09-13). Neither has posted
+  a capture. No repo from either as of today.
+- Only other Nuaire wired RE: https://github.com/bdavj/pynuaire (Drimaster
+  ECO-HC internal UART; change-flag byte + shared counter + negative-sum-8).
+- The VSC/NET bus is Nuaire's **Ecosmart Classic** network (2002): 4-core
+  SELV, 12 Vdc from the fan, 32 devices, unterminated multidrop, peripherals
+  MRXBOX95-HUM/PIR/RFI on the same bus. Nuaire publishes no wire spec.
+  Docs: https://info.nuaire.co.uk/IandM/{671432,671703,671700,671824,671415,671443}.pdf
+- Commercial ES-LCD programmer runs Linux from a removable SD card
+  (I&M 671415) — dumpable firmware if one is obtained.
+- WS3471 = MAX3471-class (1/8 UL, 64 kbps, fail-safe RX).
+- Titon BEAM (other UK MVHR maker) uses RS485 at 1200 baud too, but ASCII.
+
 ## To do
-- [ ] Re-read full thread (all posts, not just #5) and mine for photos/pinouts
-- [ ] Search GitHub for "nuaire", "mrxbox" repos
-- [ ] Check FCC/CE teardown photos, Nuaire installation manuals for connector
-      pinouts (manual sometimes labels the controller cable cores)
+- [x] Re-read full thread — done 2026-09-16 (above)
+- [x] Search GitHub for "nuaire", "mrxbox" repos — only pynuaire
+- [x] Nuaire manuals for pinouts — none label the cores; only the HA-thread
+      claim (+V, 0V, Data+, Data−) exists
+- [ ] Ask MNeverOff / abinitio1980 for a display-side capture (link vsc-mitm.md)
+- [ ] Price MRXBOX95-HUM / -PIR / ES-UCF / ES-LCD second-hand as cheaper
+      command sources than a VSC

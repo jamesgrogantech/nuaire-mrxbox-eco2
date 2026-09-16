@@ -6,9 +6,11 @@ surface it in **Home Assistant** over MQTT. The unit broadcasts its status on
 the bus by itself, so a passive, receive-only tap is enough to read it.
 
 **Status:** humidity and boost/fan state are decoded, confirmed, and running
-read-only in Home Assistant. The bus protocol is documented below. Writing
-controls (fan speed, boost) is not solved yet. Other frame bytes (temperatures?
-counters? RPM?) are being logged long-term to decode by correlation.
+read-only in Home Assistant. Framing **and checksum** are solved (XOR, see
+below), so valid frames can be constructed. Writing controls (fan speed, boost)
+is not solved yet: the display→unit command format has never been captured.
+Temperatures are not broadcast — the display polls for them. Research into the
+likely command format: [`docs/command-research.md`](docs/command-research.md).
 
 Prior art & discussion: [HA community thread](https://community.home-assistant.io/t/nuaire-mrxbox-interface-for-home-assistant/573933)
 
@@ -60,8 +62,12 @@ A3 FE FE FE FE FE FE 08
 - **Humidity (RH %)** — `3B` message, **byte 1, bit-reversed = RH %** directly.
   (`rev(0xC2)=0x43=67 %`.) Shower-stimulus confirmed.
 - **Boost / fan** — `21` message, **bit `0x02` of byte 2**: clear = ON, set =
-  OFF. (`21 AA F4 D4` on / `21 AA F6 D6` off.) Byte 3 is an integrity copy of
-  byte 2 with bit `0x20` cleared.
+  OFF. (`21 AA F4 D4` on / `21 AA F6 D6` off.)
+- **Checksum** — last byte of every message. XOR of *all* bytes in a message
+  (header, data, check) is always `0xAB` raw (`0xD5` bit-reversed), i.e.
+  `chk = 0xAB ^ hdr ^ d1 ^ … ^ dN`. Verify: `python3 tools/checksum_verify.py captures/*.log`.
+- **Structure** — bit-reversed, every header has bit 7 set and every data /
+  check byte has bit 7 clear (7-bit payload, `0x7F` = padding). MIDI-style.
 
 Full working notes, evidence, and open questions: [`docs/protocol.md`](docs/protocol.md).
 
@@ -129,6 +135,7 @@ out what the unknown bytes mean — see [`docs/longterm-logging.md`](docs/longte
 | [`docs/hardware.md`](docs/hardware.md) | Safety, pin identification, wiring |
 | [`docs/longterm-logging.md`](docs/longterm-logging.md) | Decoding the remaining frame bytes |
 | [`docs/vsc-mitm.md`](docs/vsc-mitm.md) | **Have a VSC display? Capture the temperatures** (MITM guide) |
+| [`docs/command-research.md`](docs/command-research.md) | Ecosmart bus facts, comparable protocols, command-format hypotheses |
 | [`docs/roadmap.md`](docs/roadmap.md) | Phased plan + next steps |
 | [`docs/prior-art.md`](docs/prior-art.md) | Other people's Nuaire work |
 | [`firmware/ha/ha_read.py`](firmware/ha/ha_read.py) | Pico W → HA MQTT bridge (production) |

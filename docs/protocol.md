@@ -154,13 +154,54 @@ every byte bit-reversed. To interpret data values, bit-reverse each byte:
 0xFE (= 0x7F reversed = padding) and why humidity looked like noise until
 reversed. Header/framing bytes: keep raw for matching; reverse DATA bytes.
 
+## Message structure — 7-bit data, header flag — CONFIRMED 2026-09-16
+
+Look at the frame in the unit's MSB-first bit order (bit-reverse every byte):
+
+```
+hdr   data ...                         chk      (all values MSB-first / rev())
+84    55 2F                            2B       21-msg  (boost ON)
+88    6F 32                            ...      11-msg
+8A    7F 7F 7F                         20       51-msg
+8C    7F 7F                            59       31-msg
+CC    7F 7F                            19       33-msg
+A1    74 7F 0C 7F 7F                   73       85-msg
+C5    7F 7F 7F 7F 7F 7F                10       A3-msg
+AE    7F 7F 7F 7F                      7B       75-msg
+DC    43 2A                            60       3B-msg  (RH 67)
+```
+
+- **Every header byte has bit 7 SET** (`0x84 0x88 0x8A 0x8C 0xCC 0xA1 0xC5 0xAE
+  0xDC`); **every data byte and the check byte have bit 7 CLEAR**. In the raw
+  UART view that is "headers are odd, everything else is even" — true of all 36
+  captured messages. This is a MIDI-style scheme: the high bit marks the start
+  of a message, payload is 7-bit (0..127), `0x7F` = "no value / padding".
+- So a receiver resynchronises on any byte ≥ 0x80 — the inter-message gap is
+  not the only delimiter. Any frame *we* send must follow the same rule:
+  header ≥ 0x80, payload bytes ≤ 0x7F, XOR check as above.
+- 7-bit payload also explains why every decoded value so far is < 128 and why
+  RH % fits in one byte. Temperatures (if signed / scaled) would need either an
+  offset (e.g. value + 40) or two 7-bit bytes.
+- Header bits 6..0 (`04 08 0A 0C 4C 21 45 2E 5C`) presumably encode message
+  type and/or source address. `0x8C` (31-msg) and `0xCC` (33-msg) differ only
+  in bit 6 and both carry a single constant byte — HYPOTHESIS: bit 6 = a
+  class/direction flag and bits 4..0 = parameter id. No length field: length is
+  implied by header (or by gap / next header).
+- HYPOTHESIS: not all 9 messages need come from the main PCB. Ecosmart is a
+  multi-device network (internal RH sensor, display, optional PIR/CO2 sensors).
+  Some of the padding-only messages could be the PCB *polling* the internal
+  sensor with the `3B` message being its reply — i.e. a request/response pair
+  may already be present in the broadcast. Test: log per-message timestamps;
+  a request→reply pair shows a different (latency-shaped) gap than the PCB's
+  back-to-back scheduling. Our firmware currently drops the timing.
+
 ## Decoded fields
 
 ### Humidity — DECODED to RH% — 2026-08-28
 `3B` message, **byte 1, bit-reversed = relative humidity %**.
 Evidence: shower rise gave rev-values 67→70→72; 5-min dry-out hovered
-70–73 (%). ~71% in a used bathroom is physically correct. Byte 3 is a
-mirror/check byte. (Cross-check against a hygrometer to confirm exact scale,
+70–73 (%). ~71% in a used bathroom is physically correct. Byte 3 is the XOR
+checksum (see Checksum, corrected 2026-09-16). (Cross-check against a hygrometer to confirm exact scale,
 but it reads as direct RH%.)
 
 ### Fan/boost — PINPOINTED (clean, 1200 baud) — 2026-08-28
@@ -168,9 +209,8 @@ Boost toggle diff (tools/diff_frames.py), only the `21` message changed:
 - boost ON : `21 AA F4 D4`
 - boost OFF: `21 AA F6 D6`
 Fan/boost state = **bit 0x02 of byte index 2 in the `21` message** (ON→0,
-OFF→1). Byte 3 mirrors byte 2 with bit 0x20 cleared (integrity copy — useful
-for constructing valid write frames later). This SUPERSEDES the old smeared
-9C/90 reading below.
+OFF→1). Byte 3 is the XOR checksum (see Checksum), not a mirror — corrected
+2026-09-16. This SUPERSEDES the old smeared 9C/90 reading below.
 
 ### Fan/boost state — OLD smeared reading (pre-decode, superseded) — 2026-08-28
 Stimulus test: captured the broadcast byte-histogram boost-OFF vs boost-ON
@@ -260,10 +300,35 @@ _Template for full field entries once decoded:_
 - Evidence: captures/`<file>` lines N–M; cross-checked against <independent
   observation, e.g. breathing on the sensor raised RH reading>
 
-## Checksum
+## Checksum — CONFIRMED XOR, 2026-09-16
 
-UNKNOWN. tools/analyze.py tests sum8, XOR, CRC8 (poly 0x07/0x31), and
-CRC16-Modbus automatically over every gap-split frame.
+**The last byte of every message is an XOR check.** XOR of *all* raw bytes in
+a message (header + data + check byte) is always `0xAB` (raw, UART LSB-first
+view). Equivalently, in the unit's own MSB-first bit order (`rev()` each byte):
+
+```
+chk = 0xD5 ^ hdr ^ d1 ^ d2 ^ ... ^ dN        # MSB-first view, result always < 0x80
+chk_raw = 0xAB ^ hdr_raw ^ d1_raw ^ ... ^ dN_raw   # what our UART sees
+```
+
+Evidence — 36/36 messages, 12 distinct byte-patterns, three independent sources:
+- captures/20260828-DECODED-1200baud-rest.log (boost ON, RH 67)
+- captures/20260915-full-frame-all-bytes.log (boost OFF, RH 70, different `85`)
+- the HA long-term frame in docs/longterm-logging.md (RH 64, `85` = 116/12/115)
+Verify any time: `python3 tools/checksum_verify.py captures/*.log captures/*.txt`.
+
+Consequences:
+- The bytes previously called "mirror"/"integrity copy" (`21` byte 3, `3B`
+  byte 3, `85` byte 6) are **this checksum**, not data. HA raw sensors
+  `21_3`, `3B_3`, `85_6` are therefore derived, not independent fields.
+- Real payload per message is one byte shorter than assumed:
+  `21` = 2 data bytes (85, boost), `3B` = 2 (RH, 42), `85` = 3 (varying).
+- We can now **construct valid frames**, which was a stated precondition for
+  any write-back experiment (see Phase 3). Framing + checksum are both known.
+- Why the constant: the receiver most likely XORs every byte of a message into
+  an accumulator seeded with `0x55` (MSB-first) and expects a 7-bit result of
+  zero with the header flag bit left set — i.e. `0xD5`. Cosmetic; the formula
+  above is what matters.
 
 ## Bus roles
 
