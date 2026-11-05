@@ -372,6 +372,34 @@ Realistic paths to write-back:
 3. Otherwise: ship READ-ONLY (humidity/temp/fan state) to HA now; add control
    later once a VSC is available.
 
+## Upstream cross-check: karwantes/Nuaire-MVHR — 2026-11-02
+
+Source: https://github.com/karwantes/Nuaire-MVHR at `dc6fb54` (`docs/protocol.md`,
+`docs/option1-no-vsc.md`). Measured there on one MRXBOXAB-ECO4 with a real VSC.
+The earlier commit `56a1c89` only controls the unit through a real VSC; the no-VSC
+RS485 route was added after it. Nothing below has been transmitted or tested on
+our ECO2.
+
+Matches our captures (`captures/20260828-DECODED-1200baud-rest.log`,
+`captures/20260915-full-frame-all-bytes.log`): 1200 8N1 MSB-first, the 9 frame IDs,
+XOR-to-`D5`, and byte-identical "no VSC" defaults for all four controller slots.
+
+HYPOTHESIS: the unit is bus master. `88`, `8A`, `AE` and `C5` are polls that a
+controller answers in-slot, about 50 µs after the ID; with no answer the unit sends
+the defaults we capture. This would explain the failed 2026-08-28 replay: that frame
+used the unit's own `84` ID and was not sent in a controller slot.
+
+HYPOTHESIS: `A1` (raw `85`) carries temperatures, so "temperatures are poll-only" and
+the "`85` = fan/mode" reading above are probably wrong. `v = rev(b) >> 1`, signed
+7-bit °C; byte 1 = extract, byte 3 = intake. Our logged `85_1` values
+{12,52,76,84,116} decode to {24,22,25,21,23} °C, a contiguous range. Not yet checked
+against a reference thermometer or outdoor temperature.
+
+HYPOTHESIS, UNRESOLVED: RH may be inverted (`RH = byte ^ 0x7F`, not `rev(raw)`). On
+2026-11-02 our HA sensor read 79 (would be 48 inverted) with rooms at 51, 55.5 and
+61.4 %, which favours inversion. Our 2026-08-28 shower test (67→70→72) favours the
+current formula. Re-run the shower test against a reference hygrometer.
+
 ## Write-back (Phase 3 — earlier notes)
 
 Preconditions before any transmit: framing CONFIRMED, checksum CONFIRMED,
