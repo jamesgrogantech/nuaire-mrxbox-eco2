@@ -6,3 +6,7 @@ __pycache__/
 
 # long-term logger output
 nuaire_raw.csv
+
+# ESPHome
+firmware/esphome/secrets.yaml
+firmware/esphome/.esphome/
