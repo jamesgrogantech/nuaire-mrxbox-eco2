@@ -8,10 +8,19 @@ telnet, no unauthenticated OTA; encrypted native API to Home Assistant).
   emulation core (25 µs timer ISR + bus edge ISR bit-bang the replies to polls
   88/8A/AE/C5; frames 84/A1/DC decoded for faults, temps, humidity; the VSC's
   speed-3/night/holiday/bypass timers). Upstream: karwantes/Nuaire-MVHR
-  `esp/vsc-serial-bridge` at dc6fb54 (no license published — personal use only,
-  don't publish this port without asking).
+  `esp/vsc-serial-bridge` at dc6fb54.
 - `mrxbox.yaml` — device config; entities are template wrappers over the component.
 - `secrets.yaml` — git-ignored; copy `secrets.example.yaml`.
+
+## Credits
+
+All the protocol work behind this component, and the emulation design and
+timing, are by **karwantes**:
+[karwantes/Nuaire-MVHR](https://github.com/karwantes/Nuaire-MVHR). This is a
+port of that code to ESPHome. Upstream publishes no license, so the repo's MIT
+license does not cover `components/nuaire_vsc/`; its terms are karwantes'.
+
+## Build
 
 Build and update over WiFi:
 

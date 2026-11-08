@@ -145,7 +145,8 @@ out what the unknown bytes mean — see [`docs/longterm-logging.md`](docs/longte
 | [`docs/command-research.md`](docs/command-research.md) | Ecosmart bus facts, comparable protocols, command-format hypotheses |
 | [`docs/roadmap.md`](docs/roadmap.md) | Phased plan + next steps |
 | [`docs/prior-art.md`](docs/prior-art.md) | Other people's Nuaire work |
-| [`firmware/ha/ha_read.py`](firmware/ha/ha_read.py) | Pico W → HA MQTT bridge (production) |
+| [`firmware/ha/ha_read.py`](firmware/ha/ha_read.py) | Pico W → HA MQTT bridge (read-only) |
+| [`firmware/esphome/`](firmware/esphome/) | ESP32 ESPHome firmware: controls the unit by emulating the VSC (port of karwantes' bridge) |
 | [`firmware/sniffer/`](firmware/sniffer/) | Bench tools: baud finder, bit timing, decoders |
 | [`tools/`](tools/) | Desktop capture/analysis (plain Python 3, stdlib) |
 | [`captures/`](captures/) | Raw logs (immutable; see naming convention) |
@@ -168,4 +169,15 @@ your hardware/unit.
 ## Credits
 
 Kicked off from the HA community thread linked above — thanks to everyone there
-for the WS3471/pinout pointers. Licensed under [MIT](LICENSE).
+for the WS3471/pinout pointers.
+
+Big thanks to **karwantes** and [karwantes/Nuaire-MVHR](https://github.com/karwantes/Nuaire-MVHR),
+who decoded the VSC wall controller and wrote the `vsc-serial-bridge` that
+controls the unit by answering its polls. The humidity and temperature
+encodings and the whole VSC-emulation approach come from that project, and
+[`firmware/esphome/components/nuaire_vsc/`](firmware/esphome/components/nuaire_vsc/)
+is a port of its emulation core.
+
+Licensed under [MIT](LICENSE), except `firmware/esphome/components/nuaire_vsc/`:
+that is derived from karwantes' code, which has no published license, so the MIT
+grant does not cover it and its terms are karwantes'.
