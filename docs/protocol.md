@@ -197,7 +197,10 @@ DC    43 2A                            60       3B-msg  (RH 67)
 
 ## Decoded fields
 
-### Humidity — DECODED to RH% — 2026-08-28
+### Humidity — DECODED to RH% — 2026-08-28 (formula SUPERSEDED 2026-11-05)
+> Firmware now uses `RH = rev(b) ^ 0x7F` (inverted), per the upstream
+> cross-check below. The formula in this section is kept for history.
+
 `3B` message, **byte 1, bit-reversed = relative humidity %**.
 Evidence: shower rise gave rev-values 67→70→72; 5-min dry-out hovered
 70–73 (%). ~71% in a used bathroom is physically correct. Byte 3 is the XOR
@@ -244,7 +247,7 @@ reading (bit-smeared) ~0x7C dry / ~0x80 humid. Also 0x70 fell 6.0%→1.8% and
 stayed (possible related field or humidity auto-boost threshold).
 Once clean-decoded: map the byte to actual RH%.
 
-### Fan / mode — `85` message — HYPOTHESIS (2026-09-15)
+### Fan / mode — `85` message — HYPOTHESIS (2026-09-15, likely WRONG: see upstream cross-check, `85` = temperatures)
 The `85` message (`85 2A FE 2E FE FE D4`, positions 85_1/85_3/85_6 bit-reversed)
 is the only *varying* non-humidity data in the broadcast. Over 50 h it steps
 between a small discrete set (85_1 in {12,52,76,84,116}) at intervals of hours,
@@ -260,7 +263,7 @@ a live watch to pin values to 20/50/100 %. Note: an earlier "arithmetic step-2"
 reading of these bytes was a bit-order error (double bit-reversal); the true
 values are the sensor values above.
 
-### Temperatures are NOT broadcast — they are POLL-ONLY — CONFIRMED (2026-09-15)
+### Temperatures are NOT broadcast — they are POLL-ONLY — 2026-09-15 (likely WRONG: see upstream cross-check, they are in `85`)
 The MRXBOX-VSC controller **does** show Outside + Average-Indoor temperature, and
 the unit has an Extract and a Supply temperature sensor (VSC manual §4.1, §9,
 docs/img or Downloads). But the temperatures are **not present in the unit's
@@ -389,16 +392,76 @@ controller answers in-slot, about 50 µs after the ID; with no answer the unit s
 the defaults we capture. This would explain the failed 2026-08-28 replay: that frame
 used the unit's own `84` ID and was not sent in a controller slot.
 
-HYPOTHESIS: `A1` (raw `85`) carries temperatures, so "temperatures are poll-only" and
-the "`85` = fan/mode" reading above are probably wrong. `v = rev(b) >> 1`, signed
-7-bit °C; byte 1 = extract, byte 3 = intake. Our logged `85_1` values
-{12,52,76,84,116} decode to {24,22,25,21,23} °C, a contiguous range. Not yet checked
-against a reference thermometer or outdoor temperature.
+HYPOTHESIS (in firmware since 2026-11-05): `A1` (raw `85`) carries temperatures, so
+"temperatures are poll-only" and the "`85` = fan/mode" reading above are probably
+wrong. MSB-first value `v = rev(b) >> 1`, which is simply `raw >> 1`, signed 7-bit
+°C (−63 = sensor fault); byte 1 = extract air, byte 3 = fresh-air intake. Evidence
+on our unit:
+- Our logged `85_1` values {12,52,76,84,116} decode to {24,22,25,21,23} °C, a
+  contiguous indoor range. Read in the wrong bit order they looked like big jumps,
+  which is why they were taken for a fan mode.
+- `captures/20260828-DECODED-1200baud-rest.log`: extract 23, intake 24 (warm late
+  August). `captures/20260915-full-frame-all-bytes.log`: extract 21, intake 23.
+- Live 2026-11-05: extract 18, intake 17 °C. Intake looks warm for November, so the
+  intake sensor may sit in the warm airing cupboard or behind a long indoor duct
+  run. Check it against outdoor temperature before treating it as "outside".
 
-HYPOTHESIS, UNRESOLVED: RH may be inverted (`RH = byte ^ 0x7F`, not `rev(raw)`). On
-2026-11-02 our HA sensor read 79 (would be 48 inverted) with rooms at 51, 55.5 and
-61.4 %, which favours inversion. Our 2026-08-28 shower test (67→70→72) favours the
-current formula. Re-run the shower test against a reference hygrometer.
+HYPOTHESIS (in firmware since 2026-11-05): RH is inverted, `RH = rev(b) ^ 0x7F`
+(0 or 127 = sensor fault). Upstream takes this from the VSC's own decode
+(`es-lcd`) and its screen. On our unit:
+- For: 2026-11-02 the old formula read 79 (inverted 48) with rooms at 51, 55.5 and
+  61.4 %; 2026-11-05 the old formula again read 79 (inverted 48).
+- Against: the 2026-08-28 shower test, where the old formula rose 67→70→72
+  (inverted would fall 60→57→55). That test never saw the value drop back, so it is
+  weak evidence either way.
+- To confirm: run a shower or boil a kettle under an extract valve and watch
+  `MRXBOX Humidity` in HA. It must rise. If it falls, revert to `rev(b)`.
+
+## Replay plan: VSC emulation via karwantes bridge — 2026-11-06
+
+Owner decision 2026-11-06: transmit by emulating the VSC. This deviates from the
+"target frame captured verbatim from a real device" precondition below: the reply
+frames come from a VSC captured on an ECO4 (upstream), not from our ECO2.
+
+- **Hardware:** ESP32-WROOM dev board + XY-485 (MAX485ESA, CD4069 auto-direction,
+  HT7133 3.3 V regulator). XY-485 VCC from ESP VIN (5 V), RXD → GPIO25,
+  TXD → GPIO26, A+ → yellow, B− → green, GND → blue. No VSC on the bus. The Pico W
+  tap stays on the bus receive-only as an independent monitor.
+- **Firmware:** upstream `esp/vsc-serial-bridge/vsc-serial-bridge.ino` at
+  `dc6fb54`, unmodified, built for "ESP32 Dev Module" (arduino-cli, esp32 core
+  3.3.12). TXD is driven high from the first line of `setup()`, and emulation is
+  off on a fresh flash, so it boots receive-only.
+- **What is sent:** only in-slot answers to the unit's polls `88`, `8A`, `AE`,
+  `C5` (raw `11`, `51`, `75`, `A3`), starting ~30 µs after the poll ID's stop bit.
+  Bytes per upstream `docs/protocol.md` "Answering the polls". Factory defaults:
+  speed 1, mode `7F` (none), airflow 100/100/18/32/18/32.
+- **Step 1, receive check:** `/bus` shows the 9 frame IDs about every 0.7 s and
+  `/status` `bus_edges` rises. No transmit.
+- **Step 2, one test:** turn emulation on (`curl -X POST -d on=1
+  http://vsc-bridge.local/emu`). Expect **Communication with unit** = Connected,
+  `/emu` `sent` rising with `late` near 0, and the Pico's `nuaire/raw` still
+  decoding with valid checksums. Then speed 3 → listen for fans → speed 1.
+- **Back out:** `on=0` stops transmitting at once; or pull ESP power. The unit
+  falls back to its own defaults (hard-wired speed). Back out if the Pico starts
+  seeing checksum failures, frames garble, or a fan fault appears.
+- **Not tested here yet:** the airflow % mapping on this model.
+
+### Result, 2026-11-08 (one run — HYPOTHESIS until repeated)
+- Flashed via a Pico W running a MicroPython USB↔UART1 bridge (GP4 TX, GP5 RX);
+  the dev board's own CP2102 was faulty and debugprobe passed no data. The
+  board's RST button did nothing; download mode was entered by holding BOOT
+  while re-applying V5. ESP32 browned out on Pico VBUS power; runs fine on USB.
+- Step 1 passed: `/bus` showed all 9 frame IDs (84 88 8A 8C CC A1 C5 AE DC)
+  about every 0.70 s, 0 dropped, decode extract 19 °C / intake 18 °C / RH 46 %.
+- Step 2: `on=1` → `sent` rose evenly on 88/8A/AE/C5 (~1 each per cycle),
+  `late` 0, `comms` true, the unit's own frames (84 8C CC A1 DC) unchanged
+  and clean. Our replies are not seen in `/bus` (XY-485 auto-direction
+  disables RX while sending). **speed 3 → fans audibly sped up (owner
+  confirmed); then speed 1.** So the ECO2 does accept the ECO4 VSC's answers
+  for speed. The Pico was not on the bus as an independent monitor for this run.
+- Before emulation, with no VSC, the poll slots already carried bytes
+  (`88 6F 32`, `8A 7F 7F 7F 20`, `AE 7F 7F 7F 7F 7B`, `C5 7F…7F 10`);
+  origin unknown (HYPOTHESIS: unit fills empty slots itself).
 
 ## Write-back (Phase 3 — earlier notes)
 

@@ -29,8 +29,10 @@ import urllib.request
 
 COLS = ["11_1","11_2","21_1","21_2","21_3","31_3","33_3","3B_1","3B_2","3B_3",
         "51_4","75_5","85_1","85_3","85_6","A3_7"]
-KNOWN = {"21_2": "boost/fan (known)", "3B_1": "humidity % (known)",
-         "33_3": "was mis-IDd as temp"}
+KNOWN = {"21_2": "boost/fan (known)", "3B_1": "humidity (RH = value ^ 127)",
+         "33_3": "was mis-IDd as temp",
+         "85_1": "extract temp (rev(value) >> 1, signed)",
+         "85_3": "intake temp (rev(value) >> 1, signed)"}
 
 
 def pearson(a, b):

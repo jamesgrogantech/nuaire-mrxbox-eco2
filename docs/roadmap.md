@@ -9,13 +9,17 @@
 
 ## Phase 2 — protocol decode ✅ (broadcast fully mapped)
 - [x] Frame = 9 gap-separated messages, ~0.7 s repeat (21 11 51 31 33 85 A3 75 3B)
-- [x] **Humidity** decoded + confirmed (3B byte1, bit-reversed = RH %)
+- [x] **Humidity** decoded (3B byte1). Formula changed 2026-11-05 to
+      `rev(b) ^ 0x7F` per karwantes/Nuaire-MVHR; [ ] shower test to confirm.
+- [x] **Temperatures** found in `85` (byte 1 extract, byte 3 intake, `raw >> 1`
+      signed) per karwantes/Nuaire-MVHR, 2026-11-05; [ ] check against
+      reference thermometers. This supersedes the two items below.
 - [x] **Boost/fan** decoded + confirmed (21 byte2 bit 0x02; verified via bit-rev)
 - [x] Full frame captured: every non-mapped byte is padding — the broadcast
       carries nothing else. All 16 candidate bytes logged long-term.
-- [~] `85` message = fan speed / mode (HYPOTHESIS) — needs a speed/shower stimulus
-- [x] **Temperatures are NOT in the broadcast — poll-only** (see below). No
-      temperature or run-time counter is obtainable passively.
+- [~] ~~`85` message = fan speed / mode~~ (superseded: `85` = temperatures)
+- [~] ~~Temperatures are NOT in the broadcast — poll-only~~ (superseded). Run-time
+      counters really aren't on the bus: the VSC keeps them itself.
 
 ## Phase 2b — get the polled data (temperatures, counters, diagnostics)
 The VSC display shows Outside + Indoor temp and the unit has Extract + Supply
@@ -53,10 +57,9 @@ written and reviewed. Receive-only until then.
 ## Phase 4 — Home Assistant ✅ (read-only live) / ongoing
 - [x] Headless Pico W → MQTT bridge with HA auto-discovery, self-healing
       (watchdog + broker-liveness reset for the CYW43 zombie-WiFi failure mode)
-- [x] Live entities: **humidity**, **boost**; all 16 raw bytes on `nuaire/raw`
-      for long-term decoding (16 diagnostic sensors via MQTT discovery)
-- [ ] Add fan speed/mode once `85` is confirmed
-- [ ] Add temperatures once Phase 2b lands
+- [x] Live entities: **humidity**, **extract / intake temperature**, **boost**;
+      all 16 raw bytes on `nuaire/raw` for long-term decoding (16 diagnostic
+      sensors via MQTT discovery)
 - [ ] Add controls (speed, boost) once Phase 3 lands
 
 ## Community / repo

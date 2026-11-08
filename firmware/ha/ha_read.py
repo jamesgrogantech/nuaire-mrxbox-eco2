@@ -4,9 +4,15 @@
 # Receive-only: MAX485 DE+/RE tied to GND. See docs/protocol.md.
 # Kept flat and ASCII-only on purpose: this exact structure is the one verified
 # stable on the bench (refactors and a non-ASCII degree symbol both broke it).
-# Fields (data bytes are MSB-first -> bit-reverse):
-#   humidity = msg 3B byte1 rev -> RH%;  temp = msg 33 byte3 rev -> C;
-#   boost    = msg 21 byte2 bit 0x02 (ON when clear)
+# Fields, in raw UART bytes (the bus is MSB-first, so a UART sees each byte
+# bit-reversed). A message is used only if all its raw bytes XOR to 0xAB.
+#   humidity     = msg 3B byte1: rev(b) ^ 0x7F -> RH %   (0 or 127 = sensor fault)
+#   temp_extract = msg 85 byte1: b >> 1, signed 7-bit -> C  (-63 = sensor fault)
+#   temp_intake  = msg 85 byte3: same encoding
+#   boost        = msg 21 byte2 bit 0x02 (ON when clear)
+# Humidity and temperature encodings follow karwantes/Nuaire-MVHR (decoded from
+# the VSC's own firmware); HYPOTHESIS on this ECO2 until a stimulus test
+# confirms them. See docs/protocol.md "Upstream cross-check".
 # Setup: mpremote mip install umqtt.simple; cp secrets.py + this as :main.py
 #
 # Resilience: a hardware WDT (8.388s, the RP2040 max) is fed at the top of the
@@ -25,6 +31,18 @@ def rev(b):
     for i in range(8):
         r = (r << 1) | ((b >> i) & 1)
     return r
+
+def msg_ok(b, i, n):
+    # n raw bytes from b[i] (header .. checksum) XOR to 0xAB on a good message
+    if i + n > len(b): return False
+    x = 0
+    for k in range(i, i + n): x ^= b[k]
+    return x == 0xAB
+
+def temp(b):
+    v = b >> 1                       # raw b >> 1 == rev(msb-first byte) >> 1
+    v = v - 128 if v >= 64 else v    # signed 7-bit
+    return None if v == -63 else v   # -63 = sensor fault
 
 w = network.WLAN(network.STA_IF); w.active(True)
 try: w.config(pm=0xa11140)
@@ -56,11 +74,10 @@ def connect():
     # keep the device block small so the discovery JSON stays well under any
     # MQTT publish-buffer limit (a longer payload was seen truncating earlier)
     dev = {'identifiers': ['nuaire_mrxbox'], 'name': 'Nuaire MRXBOX ECO2'}
-    # NOTE: temperature intentionally NOT published. The 0x33-byte3 value that
-    # looked like ~25C is perfectly constant and does not respond to warming the
-    # sensor (unlike humidity, which jitters) \u2014 it is not a live temperature.
-    # Only humidity and boost are stimulus-confirmed. See docs/protocol.md.
+    degc = '\u00b0C'   # escaped so this source stays ASCII; payload is encoded below
     for kind, key, extra in [('sensor','humidity',{'name':'MRXBOX Humidity','device_class':'humidity','unit_of_measurement':'%','state_class':'measurement'}),
+                             ('sensor','temp_extract',{'name':'MRXBOX Extract Temperature','device_class':'temperature','unit_of_measurement':degc,'state_class':'measurement'}),
+                             ('sensor','temp_intake',{'name':'MRXBOX Intake Temperature','device_class':'temperature','unit_of_measurement':degc,'state_class':'measurement'}),
                              ('binary_sensor','boost',{'name':'MRXBOX Boost','payload_on':'ON','payload_off':'OFF'})]:
         p = {'state_topic':'nuaire/'+key,'expire_after':90,'unique_id':'nuaire_mrxbox_'+key,'device':dev}
         p.update(extra)
@@ -74,7 +91,8 @@ def connect():
 wdt.feed()
 c = connect()   # if the broker is down this may block; the WDT resets us then
 u = UART(1, baudrate=1200, bits=8, parity=None, stop=1, rx=Pin(5), timeout=0, rxbuf=1024)
-buf = bytearray(); vals = {'humidity': None, 'boost': None}
+buf = bytearray()
+vals = {'humidity': None, 'temp_extract': None, 'temp_intake': None, 'boost': None}
 # gap-split message assembler for the raw-frame log (additive; the anchored
 # humidity/boost decode above is untouched). frame[header] = list of raw bytes.
 mbuf = bytearray(); mlast = time.ticks_us(); frame = {}
@@ -94,9 +112,14 @@ while True:
         buf.extend(d)
         if len(buf) > 400: buf = bytearray(buf[-200:])
         for i in range(len(buf) - 3):
-            if buf[i] == 0x3B and buf[i+2] == 0x54:
-                v = rev(buf[i+1]); vals['humidity'] = v if 0 <= v <= 100 else vals['humidity']
-            elif buf[i] == 0x21 and buf[i+1] == 0xAA:
+            h = buf[i]
+            if h == 0x3B and msg_ok(buf, i, 4):
+                v = rev(buf[i+1]) ^ 0x7F
+                if 0 < v <= 100: vals['humidity'] = v
+            elif h == 0x85 and msg_ok(buf, i, 7):
+                vals['temp_extract'] = temp(buf[i+1])
+                vals['temp_intake'] = temp(buf[i+3])
+            elif h == 0x21 and msg_ok(buf, i, 4):
                 vals['boost'] = 'ON' if (buf[i+2] & 0x02) == 0 else 'OFF'
         if mbuf and time.ticks_diff(now, mlast) > 15000:
             frame[mbuf[0]] = list(mbuf); mbuf = bytearray()
