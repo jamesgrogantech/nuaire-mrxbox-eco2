@@ -9,13 +9,17 @@
 
 ## Phase 2 — protocol decode ✅ (broadcast fully mapped)
 - [x] Frame = 9 gap-separated messages, ~0.7 s repeat (21 11 51 31 33 85 A3 75 3B)
-- [x] **Humidity** decoded + confirmed (3B byte1, bit-reversed = RH %)
+- [x] **Humidity** decoded (3B byte1). Formula changed 2026-11-05 to
+      `rev(b) ^ 0x7F` per karwantes/Nuaire-MVHR; [ ] shower test to confirm.
+- [x] **Temperatures** found in `85` (byte 1 extract, byte 3 intake, `raw >> 1`
+      signed) per karwantes/Nuaire-MVHR, 2026-11-05; [ ] check against
+      reference thermometers. This supersedes the two items below.
 - [x] **Boost/fan** decoded + confirmed (21 byte2 bit 0x02; verified via bit-rev)
 - [x] Full frame captured: every non-mapped byte is padding — the broadcast
       carries nothing else. All 16 candidate bytes logged long-term.
-- [~] `85` message = fan speed / mode (HYPOTHESIS) — needs a speed/shower stimulus
-- [x] **Temperatures are NOT in the broadcast — poll-only** (see below). No
-      temperature or run-time counter is obtainable passively.
+- [~] ~~`85` message = fan speed / mode~~ (superseded: `85` = temperatures)
+- [~] ~~Temperatures are NOT in the broadcast — poll-only~~ (superseded). Run-time
+      counters really aren't on the bus: the VSC keeps them itself.
 
 ## Phase 2b — get the polled data (temperatures, counters, diagnostics)
 The VSC display shows Outside + Indoor temp and the unit has Extract + Supply
@@ -27,15 +31,23 @@ it. To read it we must reproduce that poll.
       (Waveshare ESP32-S3-RS485-CAN + firmware/esp32-s3/vsc_capture.py).
 - [ ] From the capture: identify the poll frame, then transmit it ourselves and
       read the reply (moves us from receive-only to active polling).
-- [ ] (Low odds without a reference) blind-fuzz poll candidates — Modbus already
-      returned nothing, so the poll is proprietary.
+- [ ] Cheaper talkers than a VSC: **MRXBOX95-HUM / -PIR** send an enable/boost
+      demand on the same Ecosmart NET bus; **ES-LCD** has its firmware on a
+      removable SD card. See docs/command-research.md §5.2.
+- [ ] Receive-only prep: per-message µs timestamps (reply-slot / poll-pair
+      hunt), attribute headers to talkers by unplugging the internal RH sensor,
+      byte-level logging for bare-byte ACKs. docs/command-research.md §5.1.
+- [ ] (Low odds without a reference) structured probes using the unit's own
+      envelope + confirmed XOR check — docs/command-research.md §5.3. Modbus
+      already returned nothing, so the poll is proprietary.
 - [ ] Optional: headless full-frame logger (small firmware add) to 100 % exclude
       a rarely-broadcast temp message.
 - [ ] One more `33_3` stimulus test (strongly warm the extract, watch live) — it
       is a stable `25` and might be a broadcast indoor temp after all.
 
 ## Phase 3 — write-back / control (gated — see docs/protocol.md preconditions)
-Requires transmitting onto the bus. Preconditions: framing + checksum confirmed,
+Requires transmitting onto the bus. Preconditions: framing + checksum confirmed
+(**both done 2026-09-16**: 7-bit payload with header flag, XOR check = 0xAB raw),
 a genuine command frame captured from a real VSC (see Phase 2b MITM), replay plan
 written and reviewed. Receive-only until then.
 - [ ] Understand the command format (from the VSC MITM capture)
@@ -45,10 +57,9 @@ written and reviewed. Receive-only until then.
 ## Phase 4 — Home Assistant ✅ (read-only live) / ongoing
 - [x] Headless Pico W → MQTT bridge with HA auto-discovery, self-healing
       (watchdog + broker-liveness reset for the CYW43 zombie-WiFi failure mode)
-- [x] Live entities: **humidity**, **boost**; all 16 raw bytes on `nuaire/raw`
-      for long-term decoding (16 diagnostic sensors via MQTT discovery)
-- [ ] Add fan speed/mode once `85` is confirmed
-- [ ] Add temperatures once Phase 2b lands
+- [x] Live entities: **humidity**, **extract / intake temperature**, **boost**;
+      all 16 raw bytes on `nuaire/raw` for long-term decoding (16 diagnostic
+      sensors via MQTT discovery)
 - [ ] Add controls (speed, boost) once Phase 3 lands
 
 ## Community / repo

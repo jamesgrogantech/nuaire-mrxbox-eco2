@@ -19,7 +19,12 @@ anything:
 ## The unit
 
 - Nuaire MRXBOX ECO2 MVHR
-- Display-controller connector on the bottom of the unit (controller not owned)
+- Display-controller connector on the bottom of the unit (controller not owned).
+  Shrouded single-row 4-pin male header with a latch window, **2.54 mm pitch**:
+  four standard female Dupont jumpers fit with their housings touching
+  (2026-11-05). Pin order per Nuaire's colour label: red (+supply), yellow (A),
+  green (B), blue (0 V). Nuaire's own lead uses a latched 4-way IDC plug;
+  exact family/part number still unknown.
 - Internal humidity/temperature sensor communicates with the main PCB over
   (presumed) the same bus
 - WS3471 MSOP-8 near the PCB pin headers — clone of SP3485-class 3.3V RS485

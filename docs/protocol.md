@@ -154,13 +154,57 @@ every byte bit-reversed. To interpret data values, bit-reverse each byte:
 0xFE (= 0x7F reversed = padding) and why humidity looked like noise until
 reversed. Header/framing bytes: keep raw for matching; reverse DATA bytes.
 
+## Message structure — 7-bit data, header flag — CONFIRMED 2026-09-16
+
+Look at the frame in the unit's MSB-first bit order (bit-reverse every byte):
+
+```
+hdr   data ...                         chk      (all values MSB-first / rev())
+84    55 2F                            2B       21-msg  (boost ON)
+88    6F 32                            ...      11-msg
+8A    7F 7F 7F                         20       51-msg
+8C    7F 7F                            59       31-msg
+CC    7F 7F                            19       33-msg
+A1    74 7F 0C 7F 7F                   73       85-msg
+C5    7F 7F 7F 7F 7F 7F                10       A3-msg
+AE    7F 7F 7F 7F                      7B       75-msg
+DC    43 2A                            60       3B-msg  (RH 67)
+```
+
+- **Every header byte has bit 7 SET** (`0x84 0x88 0x8A 0x8C 0xCC 0xA1 0xC5 0xAE
+  0xDC`); **every data byte and the check byte have bit 7 CLEAR**. In the raw
+  UART view that is "headers are odd, everything else is even" — true of all 36
+  captured messages. This is a MIDI-style scheme: the high bit marks the start
+  of a message, payload is 7-bit (0..127), `0x7F` = "no value / padding".
+- So a receiver resynchronises on any byte ≥ 0x80 — the inter-message gap is
+  not the only delimiter. Any frame *we* send must follow the same rule:
+  header ≥ 0x80, payload bytes ≤ 0x7F, XOR check as above.
+- 7-bit payload also explains why every decoded value so far is < 128 and why
+  RH % fits in one byte. Temperatures (if signed / scaled) would need either an
+  offset (e.g. value + 40) or two 7-bit bytes.
+- Header bits 6..0 (`04 08 0A 0C 4C 21 45 2E 5C`) presumably encode message
+  type and/or source address. `0x8C` (31-msg) and `0xCC` (33-msg) differ only
+  in bit 6 and both carry a single constant byte — HYPOTHESIS: bit 6 = a
+  class/direction flag and bits 4..0 = parameter id. No length field: length is
+  implied by header (or by gap / next header).
+- HYPOTHESIS: not all 9 messages need come from the main PCB. Ecosmart is a
+  multi-device network (internal RH sensor, display, optional PIR/CO2 sensors).
+  Some of the padding-only messages could be the PCB *polling* the internal
+  sensor with the `3B` message being its reply — i.e. a request/response pair
+  may already be present in the broadcast. Test: log per-message timestamps;
+  a request→reply pair shows a different (latency-shaped) gap than the PCB's
+  back-to-back scheduling. Our firmware currently drops the timing.
+
 ## Decoded fields
 
-### Humidity — DECODED to RH% — 2026-08-28
+### Humidity — DECODED to RH% — 2026-08-28 (formula SUPERSEDED 2026-11-05)
+> Firmware now uses `RH = rev(b) ^ 0x7F` (inverted), per the upstream
+> cross-check below. The formula in this section is kept for history.
+
 `3B` message, **byte 1, bit-reversed = relative humidity %**.
 Evidence: shower rise gave rev-values 67→70→72; 5-min dry-out hovered
-70–73 (%). ~71% in a used bathroom is physically correct. Byte 3 is a
-mirror/check byte. (Cross-check against a hygrometer to confirm exact scale,
+70–73 (%). ~71% in a used bathroom is physically correct. Byte 3 is the XOR
+checksum (see Checksum, corrected 2026-09-16). (Cross-check against a hygrometer to confirm exact scale,
 but it reads as direct RH%.)
 
 ### Fan/boost — PINPOINTED (clean, 1200 baud) — 2026-08-28
@@ -168,9 +212,8 @@ Boost toggle diff (tools/diff_frames.py), only the `21` message changed:
 - boost ON : `21 AA F4 D4`
 - boost OFF: `21 AA F6 D6`
 Fan/boost state = **bit 0x02 of byte index 2 in the `21` message** (ON→0,
-OFF→1). Byte 3 mirrors byte 2 with bit 0x20 cleared (integrity copy — useful
-for constructing valid write frames later). This SUPERSEDES the old smeared
-9C/90 reading below.
+OFF→1). Byte 3 is the XOR checksum (see Checksum), not a mirror — corrected
+2026-09-16. This SUPERSEDES the old smeared 9C/90 reading below.
 
 ### Fan/boost state — OLD smeared reading (pre-decode, superseded) — 2026-08-28
 Stimulus test: captured the broadcast byte-histogram boost-OFF vs boost-ON
@@ -204,7 +247,7 @@ reading (bit-smeared) ~0x7C dry / ~0x80 humid. Also 0x70 fell 6.0%→1.8% and
 stayed (possible related field or humidity auto-boost threshold).
 Once clean-decoded: map the byte to actual RH%.
 
-### Fan / mode — `85` message — HYPOTHESIS (2026-09-15)
+### Fan / mode — `85` message — HYPOTHESIS (2026-09-15, likely WRONG: see upstream cross-check, `85` = temperatures)
 The `85` message (`85 2A FE 2E FE FE D4`, positions 85_1/85_3/85_6 bit-reversed)
 is the only *varying* non-humidity data in the broadcast. Over 50 h it steps
 between a small discrete set (85_1 in {12,52,76,84,116}) at intervals of hours,
@@ -220,7 +263,7 @@ a live watch to pin values to 20/50/100 %. Note: an earlier "arithmetic step-2"
 reading of these bytes was a bit-order error (double bit-reversal); the true
 values are the sensor values above.
 
-### Temperatures are NOT broadcast — they are POLL-ONLY — CONFIRMED (2026-09-15)
+### Temperatures are NOT broadcast — they are POLL-ONLY — 2026-09-15 (likely WRONG: see upstream cross-check, they are in `85`)
 The MRXBOX-VSC controller **does** show Outside + Average-Indoor temperature, and
 the unit has an Extract and a Supply temperature sensor (VSC manual §4.1, §9,
 docs/img or Downloads). But the temperatures are **not present in the unit's
@@ -260,10 +303,35 @@ _Template for full field entries once decoded:_
 - Evidence: captures/`<file>` lines N–M; cross-checked against <independent
   observation, e.g. breathing on the sensor raised RH reading>
 
-## Checksum
+## Checksum — CONFIRMED XOR, 2026-09-16
 
-UNKNOWN. tools/analyze.py tests sum8, XOR, CRC8 (poly 0x07/0x31), and
-CRC16-Modbus automatically over every gap-split frame.
+**The last byte of every message is an XOR check.** XOR of *all* raw bytes in
+a message (header + data + check byte) is always `0xAB` (raw, UART LSB-first
+view). Equivalently, in the unit's own MSB-first bit order (`rev()` each byte):
+
+```
+chk = 0xD5 ^ hdr ^ d1 ^ d2 ^ ... ^ dN        # MSB-first view, result always < 0x80
+chk_raw = 0xAB ^ hdr_raw ^ d1_raw ^ ... ^ dN_raw   # what our UART sees
+```
+
+Evidence — 36/36 messages, 12 distinct byte-patterns, three independent sources:
+- captures/20260828-DECODED-1200baud-rest.log (boost ON, RH 67)
+- captures/20260915-full-frame-all-bytes.log (boost OFF, RH 70, different `85`)
+- the HA long-term frame in docs/longterm-logging.md (RH 64, `85` = 116/12/115)
+Verify any time: `python3 tools/checksum_verify.py captures/*.log captures/*.txt`.
+
+Consequences:
+- The bytes previously called "mirror"/"integrity copy" (`21` byte 3, `3B`
+  byte 3, `85` byte 6) are **this checksum**, not data. HA raw sensors
+  `21_3`, `3B_3`, `85_6` are therefore derived, not independent fields.
+- Real payload per message is one byte shorter than assumed:
+  `21` = 2 data bytes (85, boost), `3B` = 2 (RH, 42), `85` = 3 (varying).
+- We can now **construct valid frames**, which was a stated precondition for
+  any write-back experiment (see Phase 3). Framing + checksum are both known.
+- Why the constant: the receiver most likely XORs every byte of a message into
+  an accumulator seeded with `0x55` (MSB-first) and expects a 7-bit result of
+  zero with the header flag bit left set — i.e. `0xD5`. Cosmetic; the formula
+  above is what matters.
 
 ## Bus roles
 
@@ -306,6 +374,94 @@ Realistic paths to write-back:
    "command format wrong").
 3. Otherwise: ship READ-ONLY (humidity/temp/fan state) to HA now; add control
    later once a VSC is available.
+
+## Upstream cross-check: karwantes/Nuaire-MVHR — 2026-11-02
+
+Source: https://github.com/karwantes/Nuaire-MVHR at `dc6fb54` (`docs/protocol.md`,
+`docs/option1-no-vsc.md`). Measured there on one MRXBOXAB-ECO4 with a real VSC.
+The earlier commit `56a1c89` only controls the unit through a real VSC; the no-VSC
+RS485 route was added after it. Nothing below has been transmitted or tested on
+our ECO2.
+
+Matches our captures (`captures/20260828-DECODED-1200baud-rest.log`,
+`captures/20260915-full-frame-all-bytes.log`): 1200 8N1 MSB-first, the 9 frame IDs,
+XOR-to-`D5`, and byte-identical "no VSC" defaults for all four controller slots.
+
+HYPOTHESIS: the unit is bus master. `88`, `8A`, `AE` and `C5` are polls that a
+controller answers in-slot, about 50 µs after the ID; with no answer the unit sends
+the defaults we capture. This would explain the failed 2026-08-28 replay: that frame
+used the unit's own `84` ID and was not sent in a controller slot.
+
+HYPOTHESIS (in firmware since 2026-11-05): `A1` (raw `85`) carries temperatures, so
+"temperatures are poll-only" and the "`85` = fan/mode" reading above are probably
+wrong. MSB-first value `v = rev(b) >> 1`, which is simply `raw >> 1`, signed 7-bit
+°C (−63 = sensor fault); byte 1 = extract air, byte 3 = fresh-air intake. Evidence
+on our unit:
+- Our logged `85_1` values {12,52,76,84,116} decode to {24,22,25,21,23} °C, a
+  contiguous indoor range. Read in the wrong bit order they looked like big jumps,
+  which is why they were taken for a fan mode.
+- `captures/20260828-DECODED-1200baud-rest.log`: extract 23, intake 24 (warm late
+  August). `captures/20260915-full-frame-all-bytes.log`: extract 21, intake 23.
+- Live 2026-11-05: extract 18, intake 17 °C. Intake looks warm for November, so the
+  intake sensor may sit in the warm airing cupboard or behind a long indoor duct
+  run. Check it against outdoor temperature before treating it as "outside".
+
+HYPOTHESIS (in firmware since 2026-11-05): RH is inverted, `RH = rev(b) ^ 0x7F`
+(0 or 127 = sensor fault). Upstream takes this from the VSC's own decode
+(`es-lcd`) and its screen. On our unit:
+- For: 2026-11-02 the old formula read 79 (inverted 48) with rooms at 51, 55.5 and
+  61.4 %; 2026-11-05 the old formula again read 79 (inverted 48).
+- Against: the 2026-08-28 shower test, where the old formula rose 67→70→72
+  (inverted would fall 60→57→55). That test never saw the value drop back, so it is
+  weak evidence either way.
+- To confirm: run a shower or boil a kettle under an extract valve and watch
+  `MRXBOX Humidity` in HA. It must rise. If it falls, revert to `rev(b)`.
+
+## Replay plan: VSC emulation via karwantes bridge — 2026-11-06
+
+Owner decision 2026-11-06: transmit by emulating the VSC. This deviates from the
+"target frame captured verbatim from a real device" precondition below: the reply
+frames come from a VSC captured on an ECO4 (upstream), not from our ECO2.
+
+- **Hardware:** ESP32-WROOM dev board + XY-485 (MAX485ESA, CD4069 auto-direction,
+  HT7133 3.3 V regulator). XY-485 VCC from ESP VIN (5 V), RXD → GPIO25,
+  TXD → GPIO26, A+ → yellow, B− → green, GND → blue. No VSC on the bus. The Pico W
+  tap stays on the bus receive-only as an independent monitor.
+- **Firmware:** upstream `esp/vsc-serial-bridge/vsc-serial-bridge.ino` at
+  `dc6fb54`, unmodified, built for "ESP32 Dev Module" (arduino-cli, esp32 core
+  3.3.12). TXD is driven high from the first line of `setup()`, and emulation is
+  off on a fresh flash, so it boots receive-only.
+- **What is sent:** only in-slot answers to the unit's polls `88`, `8A`, `AE`,
+  `C5` (raw `11`, `51`, `75`, `A3`), starting ~30 µs after the poll ID's stop bit.
+  Bytes per upstream `docs/protocol.md` "Answering the polls". Factory defaults:
+  speed 1, mode `7F` (none), airflow 100/100/18/32/18/32.
+- **Step 1, receive check:** `/bus` shows the 9 frame IDs about every 0.7 s and
+  `/status` `bus_edges` rises. No transmit.
+- **Step 2, one test:** turn emulation on (`curl -X POST -d on=1
+  http://vsc-bridge.local/emu`). Expect **Communication with unit** = Connected,
+  `/emu` `sent` rising with `late` near 0, and the Pico's `nuaire/raw` still
+  decoding with valid checksums. Then speed 3 → listen for fans → speed 1.
+- **Back out:** `on=0` stops transmitting at once; or pull ESP power. The unit
+  falls back to its own defaults (hard-wired speed). Back out if the Pico starts
+  seeing checksum failures, frames garble, or a fan fault appears.
+- **Not tested here yet:** the airflow % mapping on this model.
+
+### Result, 2026-11-08 (one run — HYPOTHESIS until repeated)
+- Flashed via a Pico W running a MicroPython USB↔UART1 bridge (GP4 TX, GP5 RX);
+  the dev board's own CP2102 was faulty and debugprobe passed no data. The
+  board's RST button did nothing; download mode was entered by holding BOOT
+  while re-applying V5. ESP32 browned out on Pico VBUS power; runs fine on USB.
+- Step 1 passed: `/bus` showed all 9 frame IDs (84 88 8A 8C CC A1 C5 AE DC)
+  about every 0.70 s, 0 dropped, decode extract 19 °C / intake 18 °C / RH 46 %.
+- Step 2: `on=1` → `sent` rose evenly on 88/8A/AE/C5 (~1 each per cycle),
+  `late` 0, `comms` true, the unit's own frames (84 8C CC A1 DC) unchanged
+  and clean. Our replies are not seen in `/bus` (XY-485 auto-direction
+  disables RX while sending). **speed 3 → fans audibly sped up (owner
+  confirmed); then speed 1.** So the ECO2 does accept the ECO4 VSC's answers
+  for speed. The Pico was not on the bus as an independent monitor for this run.
+- Before emulation, with no VSC, the poll slots already carried bytes
+  (`88 6F 32`, `8A 7F 7F 7F 20`, `AE 7F 7F 7F 7F 7B`, `C5 7F…7F 10`);
+  origin unknown (HYPOTHESIS: unit fills empty slots itself).
 
 ## Write-back (Phase 3 — earlier notes)
 

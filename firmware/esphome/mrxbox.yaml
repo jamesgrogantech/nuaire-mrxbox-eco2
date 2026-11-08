@@ -1,0 +1,448 @@
+# Nuaire MRXBOX ECO2 — VSC emulation on the RS485 display bus, as an ESPHome device.
+#
+# Hardware: ESP32-WROOM dev board + XY-485 (auto-direction) on the bus connector.
+#   XY-485 VCC <- ESP VIN (5 V), GND <- ESP GND + bus blue, RXD -> GPIO25,
+#   TXD <- GPIO26, A+ <- yellow, B- <- green. No real VSC on the bus.
+# The emulation core is in components/nuaire_vsc (port of karwantes/Nuaire-MVHR
+# vsc-serial-bridge, dc6fb54). Entities below are thin templates over it.
+#
+# Build/flash: cd firmware/esphome && esphome run mrxbox.yaml
+
+esphome:
+  name: mrxbox
+  friendly_name: Nuaire MRXBOX
+  comment: MRXBOX ECO2 via RS485 VSC emulation
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      # keep the 25 us bit-bang timer running while flash is being written
+      CONFIG_GPTIMER_ISR_IRAM_SAFE: y
+
+external_components:
+  - source:
+      type: local
+      path: components
+
+logger:
+  level: INFO
+
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: mrxbox-fallback
+    password: !secret ap_password
+
+safe_mode:
+
+nuaire_vsc:
+  id: vsc
+  rx_pin: 25
+  tx_pin: 26
+  # first boot only; afterwards the switch state is restored from flash
+  emulation_default: true
+
+# ---------------------------------------------------------------- controls
+select:
+  - platform: template
+    name: Fan speed
+    icon: mdi:fan
+    options: ["1", "2", "3"]
+    update_interval: 2s
+    lambda: return id(vsc).speed_str();
+    set_action:
+      - lambda: id(vsc).set_speed(atoi(x.c_str()));
+  - platform: template
+    name: Bypass
+    icon: mdi:valve
+    options: ["Auto", "On", "Off"]
+    update_interval: 2s
+    lambda: return id(vsc).bypass();
+    set_action:
+      - lambda: id(vsc).set_bypass(x);
+
+switch:
+  - platform: template
+    restore_mode: DISABLED
+    name: VSC emulation
+    icon: mdi:chip
+    entity_category: diagnostic
+    lambda: return id(vsc).emulation();
+    turn_on_action:
+      - lambda: id(vsc).set_emulation(true);
+    turn_off_action:
+      - lambda: id(vsc).set_emulation(false);
+  - platform: template
+    restore_mode: DISABLED
+    name: Night mode
+    icon: mdi:weather-night
+    lambda: return id(vsc).night();
+    turn_on_action:
+      - lambda: id(vsc).set_night(true);
+    turn_off_action:
+      - lambda: id(vsc).set_night(false);
+  - platform: template
+    restore_mode: DISABLED
+    name: Holiday mode
+    icon: mdi:bag-suitcase
+    lambda: return id(vsc).holiday();
+    turn_on_action:
+      - lambda: id(vsc).set_holiday(true);
+    turn_off_action:
+      - lambda: id(vsc).set_holiday(false);
+  - platform: template
+    restore_mode: DISABLED
+    name: Rising humidity boost
+    icon: mdi:water-plus
+    entity_category: config
+    lambda: return id(vsc).rising_boost();
+    turn_on_action:
+      - lambda: id(vsc).set_rising_boost(true);
+    turn_off_action:
+      - lambda: id(vsc).set_rising_boost(false);
+
+number:
+  - platform: template
+    name: Bypass setpoint
+    icon: mdi:thermometer
+    entity_category: config
+    unit_of_measurement: "°C"
+    mode: box
+    min_value: 15
+    max_value: 30
+    step: 1
+    update_interval: 5s
+    lambda: return id(vsc).bypass_sp();
+    set_action:
+      - lambda: id(vsc).set_bypass_sp((int) x);
+  - platform: template
+    name: Humidity setpoint
+    icon: mdi:water-percent
+    entity_category: config
+    unit_of_measurement: "%"
+    mode: box
+    min_value: 50
+    max_value: 85
+    step: 1
+    update_interval: 5s
+    lambda: return id(vsc).humidity_sp();
+    set_action:
+      - lambda: id(vsc).set_humidity_sp((int) x);
+  - platform: template
+    name: Frost protection level
+    icon: mdi:snowflake-thermometer
+    entity_category: config
+    unit_of_measurement: "°C"
+    mode: box
+    min_value: -5
+    max_value: 0
+    step: 1
+    update_interval: 5s
+    lambda: return id(vsc).frost_sp();
+    set_action:
+      - lambda: id(vsc).set_frost_sp((int) x);
+  # airflow % per speed (keys 0-2 supply 1/2/3, 3-5 extract 1/2/3)
+  - platform: template
+    name: Supply speed 1 airflow
+    icon: mdi:fan-chevron-down
+    entity_category: config
+    unit_of_measurement: "%"
+    mode: box
+    min_value: 1
+    max_value: 100
+    step: 1
+    update_interval: 5s
+    lambda: return id(vsc).airflow(0);
+    set_action:
+      - lambda: id(vsc).set_airflow(0, (int) x);
+  - platform: template
+    name: Supply speed 2 airflow
+    icon: mdi:fan-chevron-down
+    entity_category: config
+    unit_of_measurement: "%"
+    mode: box
+    min_value: 1
+    max_value: 100
+    step: 1
+    update_interval: 5s
+    lambda: return id(vsc).airflow(1);
+    set_action:
+      - lambda: id(vsc).set_airflow(1, (int) x);
+  - platform: template
+    name: Supply speed 3 airflow
+    icon: mdi:fan-chevron-down
+    entity_category: config
+    unit_of_measurement: "%"
+    mode: box
+    min_value: 1
+    max_value: 100
+    step: 1
+    update_interval: 5s
+    lambda: return id(vsc).airflow(2);
+    set_action:
+      - lambda: id(vsc).set_airflow(2, (int) x);
+  - platform: template
+    name: Extract speed 1 airflow
+    icon: mdi:fan-chevron-up
+    entity_category: config
+    unit_of_measurement: "%"
+    mode: box
+    min_value: 1
+    max_value: 100
+    step: 1
+    update_interval: 5s
+    lambda: return id(vsc).airflow(3);
+    set_action:
+      - lambda: id(vsc).set_airflow(3, (int) x);
+  - platform: template
+    name: Extract speed 2 airflow
+    icon: mdi:fan-chevron-up
+    entity_category: config
+    unit_of_measurement: "%"
+    mode: box
+    min_value: 1
+    max_value: 100
+    step: 1
+    update_interval: 5s
+    lambda: return id(vsc).airflow(4);
+    set_action:
+      - lambda: id(vsc).set_airflow(4, (int) x);
+  - platform: template
+    name: Extract speed 3 airflow
+    icon: mdi:fan-chevron-up
+    entity_category: config
+    unit_of_measurement: "%"
+    mode: box
+    min_value: 1
+    max_value: 100
+    step: 1
+    update_interval: 5s
+    lambda: return id(vsc).airflow(5);
+    set_action:
+      - lambda: id(vsc).set_airflow(5, (int) x);
+  # VSC timer lengths, 0 = no limit
+  - platform: template
+    name: Speed 3 time limit
+    icon: mdi:fan-clock
+    entity_category: config
+    unit_of_measurement: min
+    mode: box
+    min_value: 0
+    max_value: 59
+    step: 1
+    update_interval: 5s
+    lambda: return id(vsc).timer_len(0);
+    set_action:
+      - lambda: id(vsc).set_timer_len(0, (int) x);
+  - platform: template
+    name: Night mode length
+    icon: mdi:weather-night
+    entity_category: config
+    unit_of_measurement: h
+    mode: box
+    min_value: 0
+    max_value: 8
+    step: 1
+    update_interval: 5s
+    lambda: return id(vsc).timer_len(1);
+    set_action:
+      - lambda: id(vsc).set_timer_len(1, (int) x);
+  - platform: template
+    name: Holiday length
+    icon: mdi:bag-suitcase
+    entity_category: config
+    unit_of_measurement: d
+    mode: box
+    min_value: 0
+    max_value: 21
+    step: 1
+    update_interval: 5s
+    lambda: return id(vsc).timer_len(2);
+    set_action:
+      - lambda: id(vsc).set_timer_len(2, (int) x);
+  - platform: template
+    name: Bypass override length
+    icon: mdi:valve
+    entity_category: config
+    unit_of_measurement: h
+    mode: box
+    min_value: 0
+    max_value: 12
+    step: 1
+    update_interval: 5s
+    lambda: return id(vsc).timer_len(3);
+    set_action:
+      - lambda: id(vsc).set_timer_len(3, (int) x);
+
+button:
+  - platform: template
+    name: Reset filter hours
+    icon: mdi:restore
+    entity_category: config
+    on_press:
+      - lambda: id(vsc).reset_filter();
+  - platform: restart
+    name: Restart
+
+# ---------------------------------------------------------------- readings
+sensor:
+  - platform: template
+    name: Extract air temperature
+    device_class: temperature
+    state_class: measurement
+    unit_of_measurement: "°C"
+    accuracy_decimals: 0
+    update_interval: 15s
+    lambda: return id(vsc).temp_extract();
+  - platform: template
+    name: Intake air temperature
+    device_class: temperature
+    state_class: measurement
+    unit_of_measurement: "°C"
+    accuracy_decimals: 0
+    update_interval: 15s
+    lambda: return id(vsc).temp_intake();
+  - platform: template
+    name: Humidity
+    device_class: humidity
+    state_class: measurement
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    update_interval: 15s
+    lambda: return id(vsc).humidity();
+  - platform: template
+    name: Running fan speed
+    icon: mdi:fan-auto
+    accuracy_decimals: 0
+    update_interval: 5s
+    lambda: return id(vsc).fan_running();
+  - platform: template
+    name: Run hours
+    icon: mdi:timer-outline
+    device_class: duration
+    state_class: total_increasing
+    unit_of_measurement: h
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    update_interval: 5min
+    lambda: return id(vsc).run_hours();
+  - platform: template
+    name: Filter hours
+    icon: mdi:air-filter
+    device_class: duration
+    state_class: total_increasing
+    unit_of_measurement: h
+    accuracy_decimals: 0
+    update_interval: 5min
+    lambda: return id(vsc).filter_hours();
+  # diagnostics: is the emulation answering on time?
+  - platform: template
+    name: Replies sent
+    icon: mdi:send
+    state_class: total_increasing
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    update_interval: 60s
+    lambda: return id(vsc).replies_sent();
+  - platform: template
+    name: Replies late
+    icon: mdi:timer-alert-outline
+    state_class: total_increasing
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    update_interval: 60s
+    lambda: return id(vsc).replies_late();
+  - platform: template
+    name: Bus frames received
+    icon: mdi:swap-horizontal
+    state_class: total_increasing
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    update_interval: 60s
+    lambda: return id(vsc).frames_good();
+  - platform: wifi_signal
+    name: WiFi signal
+    update_interval: 60s
+  - platform: uptime
+    name: Uptime
+
+binary_sensor:
+  - platform: template
+    name: Communication with unit
+    device_class: connectivity
+    entity_category: diagnostic
+    lambda: return id(vsc).comms();
+  - platform: template
+    name: Bypass active
+    icon: mdi:valve-open
+    lambda: return id(vsc).bypass_active();
+  - platform: template
+    name: Filter change due
+    device_class: problem
+    icon: mdi:air-filter
+    lambda: return id(vsc).filter_change();
+  - platform: template
+    name: Supply fan fault
+    device_class: problem
+    entity_category: diagnostic
+    lambda: return id(vsc).fault(0);
+  - platform: template
+    name: Extract fan fault
+    device_class: problem
+    entity_category: diagnostic
+    lambda: return id(vsc).fault(1);
+  # Heater/cooler bits read as "fault" on units with no heater/cooler fitted
+  # (p8 = AA on this ECO2). Disabled by default; enable if one is fitted.
+  - platform: template
+    name: Heater fault
+    device_class: problem
+    entity_category: diagnostic
+    disabled_by_default: true
+    lambda: return id(vsc).fault(2);
+  - platform: template
+    name: Cooler fault
+    device_class: problem
+    entity_category: diagnostic
+    disabled_by_default: true
+    lambda: return id(vsc).fault(3);
+  - platform: template
+    name: Frost fault
+    device_class: problem
+    entity_category: diagnostic
+    lambda: return id(vsc).fault(4);
+  - platform: template
+    name: Test routine required
+    device_class: problem
+    entity_category: diagnostic
+    disabled_by_default: true
+    lambda: return id(vsc).fault(5);
+
+text_sensor:
+  - platform: template
+    name: Time left
+    icon: mdi:timer-sand
+    update_interval: 30s
+    lambda: return id(vsc).timers_text();
+  - platform: template
+    name: Fault flags
+    icon: mdi:flag
+    entity_category: diagnostic
+    update_interval: 60s
+    lambda: return id(vsc).flags_hex();
+  - platform: template
+    name: Poll decode stats
+    icon: mdi:counter
+    entity_category: diagnostic
+    update_interval: 30s
+    lambda: return id(vsc).id_stats();

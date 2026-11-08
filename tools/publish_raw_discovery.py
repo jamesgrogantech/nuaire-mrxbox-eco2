@@ -23,7 +23,7 @@ import sys
 LABELS = ["11_1", "11_2", "21_1", "21_2", "21_3", "31_3", "33_3", "3B_1",
           "3B_2", "3B_3", "51_4", "75_5", "85_1", "85_3", "85_6", "A3_7"]
 # columns already published as real entities by the firmware
-KNOWN = {"21_2": "boost", "3B_1": "humidity"}
+KNOWN = {"21_2": "boost", "3B_1": "humidity", "85_1": "extract temp", "85_3": "intake temp"}
 
 DEV = {"identifiers": ["nuaire_mrxbox"], "name": "Nuaire MRXBOX ECO2"}
 

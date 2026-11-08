@@ -5,10 +5,14 @@ controller/sensor bus — **no official display controller required** — and
 surface it in **Home Assistant** over MQTT. The unit broadcasts its status on
 the bus by itself, so a passive, receive-only tap is enough to read it.
 
-**Status:** humidity and boost/fan state are decoded, confirmed, and running
-read-only in Home Assistant. The bus protocol is documented below. Writing
-controls (fan speed, boost) is not solved yet. Other frame bytes (temperatures?
-counters? RPM?) are being logged long-term to decode by correlation.
+**Status:** humidity, extract and intake temperatures and boost/fan state run
+read-only in Home Assistant. Framing **and checksum** are solved (XOR, see
+below), so valid frames can be constructed. The humidity and temperature
+encodings come from [karwantes/Nuaire-MVHR](https://github.com/karwantes/Nuaire-MVHR),
+which decoded the VSC wall controller; they still need a stimulus test on this
+ECO2. That project also controls the unit by answering its polls in the VSC's
+place; not yet tried here. Research notes:
+[`docs/command-research.md`](docs/command-research.md).
 
 Prior art & discussion: [HA community thread](https://community.home-assistant.io/t/nuaire-mrxbox-interface-for-home-assistant/573933)
 
@@ -57,11 +61,19 @@ A3 FE FE FE FE FE FE 08
 3B C2 54 06      <- humidity
 ```
 
-- **Humidity (RH %)** — `3B` message, **byte 1, bit-reversed = RH %** directly.
-  (`rev(0xC2)=0x43=67 %`.) Shower-stimulus confirmed.
+- **Humidity (RH %)** — `3B` message, byte 1: **`RH = rev(b) ^ 0x7F`**
+  (`rev(0xC2) = 0x43`, `0x43 ^ 0x7F = 60 %`). Earlier versions used `rev(b)`
+  directly, which reads inverted. Needs a shower test to confirm on this unit.
+- **Temperatures (°C)** — `85` message: byte 1 = extract air, byte 3 = fresh-air
+  intake, each **`raw >> 1` as a signed 7-bit value** (`0x2E >> 1 = 23 °C`);
+  −63 = sensor fault.
 - **Boost / fan** — `21` message, **bit `0x02` of byte 2**: clear = ON, set =
-  OFF. (`21 AA F4 D4` on / `21 AA F6 D6` off.) Byte 3 is an integrity copy of
-  byte 2 with bit `0x20` cleared.
+  OFF. (`21 AA F4 D4` on / `21 AA F6 D6` off.)
+- **Checksum** — last byte of every message. XOR of *all* bytes in a message
+  (header, data, check) is always `0xAB` raw (`0xD5` bit-reversed), i.e.
+  `chk = 0xAB ^ hdr ^ d1 ^ … ^ dN`. Verify: `python3 tools/checksum_verify.py captures/*.log`.
+- **Structure** — bit-reversed, every header has bit 7 set and every data /
+  check byte has bit 7 clear (7-bit payload, `0x7F` = padding). MIDI-style.
 
 Full working notes, evidence, and open questions: [`docs/protocol.md`](docs/protocol.md).
 
@@ -107,7 +119,8 @@ Wiring diagrams and pin-identification: [`docs/hardware.md`](docs/hardware.md).
    mpremote cp firmware/ha/ha_read.py :main.py
    mpremote reset
    ```
-5. It joins WiFi and publishes `nuaire/humidity` + `nuaire/boost` to MQTT with
+5. It joins WiFi and publishes `nuaire/humidity`, `nuaire/temp_extract`,
+   `nuaire/temp_intake` and `nuaire/boost` to MQTT with
    **Home Assistant auto-discovery** — the entities appear automatically. It is
    self-healing (watchdog + a broker-liveness probe that resets a wedged WiFi
    stack).
@@ -129,9 +142,11 @@ out what the unknown bytes mean — see [`docs/longterm-logging.md`](docs/longte
 | [`docs/hardware.md`](docs/hardware.md) | Safety, pin identification, wiring |
 | [`docs/longterm-logging.md`](docs/longterm-logging.md) | Decoding the remaining frame bytes |
 | [`docs/vsc-mitm.md`](docs/vsc-mitm.md) | **Have a VSC display? Capture the temperatures** (MITM guide) |
+| [`docs/command-research.md`](docs/command-research.md) | Ecosmart bus facts, comparable protocols, command-format hypotheses |
 | [`docs/roadmap.md`](docs/roadmap.md) | Phased plan + next steps |
 | [`docs/prior-art.md`](docs/prior-art.md) | Other people's Nuaire work |
-| [`firmware/ha/ha_read.py`](firmware/ha/ha_read.py) | Pico W → HA MQTT bridge (production) |
+| [`firmware/ha/ha_read.py`](firmware/ha/ha_read.py) | Pico W → HA MQTT bridge (read-only) |
+| [`firmware/esphome/`](firmware/esphome/) | ESP32 ESPHome firmware: controls the unit by emulating the VSC (port of karwantes' bridge) |
 | [`firmware/sniffer/`](firmware/sniffer/) | Bench tools: baud finder, bit timing, decoders |
 | [`tools/`](tools/) | Desktop capture/analysis (plain Python 3, stdlib) |
 | [`captures/`](captures/) | Raw logs (immutable; see naming convention) |
@@ -144,9 +159,9 @@ Contributions are very welcome — especially **other units** (does an MRXBOX EC
 vary? do MRXBOXAB / other Nuaire models speak the same bus?) and **other
 hardware** (an ESPHome port is the big one).
 
-**Have the MRXBOX-VSC display?** You can help unlock the temperatures — they're
-polled by the display, not broadcast, so a capture from a bus with a real VSC on
-it is the missing piece. Follow [docs/vsc-mitm.md](docs/vsc-mitm.md). Please read
+**Have the MRXBOX-VSC display?** A capture from a bus with a real VSC on it
+still helps confirm the controller's frames on an ECO2. Follow
+[docs/vsc-mitm.md](docs/vsc-mitm.md). Please read
 [CONTRIBUTING.md](CONTRIBUTING.md): it covers the receive-only safety rule, the
 capture-naming and "confirmed needs two captures" conventions, and how to report
 your hardware/unit.
@@ -154,4 +169,15 @@ your hardware/unit.
 ## Credits
 
 Kicked off from the HA community thread linked above — thanks to everyone there
-for the WS3471/pinout pointers. Licensed under [MIT](LICENSE).
+for the WS3471/pinout pointers.
+
+Big thanks to **karwantes** and [karwantes/Nuaire-MVHR](https://github.com/karwantes/Nuaire-MVHR),
+who decoded the VSC wall controller and wrote the `vsc-serial-bridge` that
+controls the unit by answering its polls. The humidity and temperature
+encodings and the whole VSC-emulation approach come from that project, and
+[`firmware/esphome/components/nuaire_vsc/`](firmware/esphome/components/nuaire_vsc/)
+is a port of its emulation core.
+
+Licensed under [MIT](LICENSE), except `firmware/esphome/components/nuaire_vsc/`:
+that is derived from karwantes' code, which has no published license, so the MIT
+grant does not cover it and its terms are karwantes'.
