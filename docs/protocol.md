@@ -463,6 +463,22 @@ frames come from a VSC captured on an ECO4 (upstream), not from our ECO2.
   (`88 6F 32`, `8A 7F 7F 7F 20`, `AE 7F 7F 7F 7F 7B`, `C5 7F…7F 10`);
   origin unknown (HYPOTHESIS: unit fills empty slots itself).
 
+### Upstream feedback, 2026-11-09 (karwantes, HA community thread)
+Reported by karwantes for their MRXBOX ECO4. Evidence from another unit, so it
+does not count towards confirming these on our ECO2:
+- RH `rev(b) ^ 0x7F` tracks a shower test correctly on the ECO4. Our own shower
+  re-test on the ECO2 is still needed.
+- Heater fault bit (p8 `0x40` clear) also reads as faulted on their unit, which
+  has no heater either. HYPOTHESIS: it means "no heater fitted".
+- Cooler fault and Test routine required are unverified upstream too. Test
+  routine required shares a bit with fan bar 3 on the VSC display.
+- −63 °C and RH 0/127 mean a faulty sensor. The ESPHome component already
+  reports these as unavailable (NAN). `ha_read.py` skips them, so the MQTT
+  entity goes unavailable when `expire_after` (90 s) runs out.
+- Byte-order mapping: upstream writes bytes MSB-first as on the wire, so our raw
+  `85`/`3B`/`21` are their `A1`/`DC`/`84`, and our checksum `AB` is their `D5`.
+  Poll IDs `88`/`8A`/`AE`/`C5` are already given in wire order here.
+
 ## Write-back (Phase 3 — earlier notes)
 
 Preconditions before any transmit: framing CONFIRMED, checksum CONFIRMED,

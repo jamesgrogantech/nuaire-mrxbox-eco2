@@ -178,6 +178,6 @@ encodings and the whole VSC-emulation approach come from that project, and
 [`firmware/esphome/components/nuaire_vsc/`](firmware/esphome/components/nuaire_vsc/)
 is a port of its emulation core.
 
-Licensed under [MIT](LICENSE), except `firmware/esphome/components/nuaire_vsc/`:
-that is derived from karwantes' code, which has no published license, so the MIT
-grant does not cover it and its terms are karwantes'.
+Licensed under [MIT](LICENSE). `firmware/esphome/components/nuaire_vsc/` is
+derived from karwantes' MIT-licensed code; their copyright notice is kept in
+[`LICENSE-karwantes`](firmware/esphome/components/nuaire_vsc/LICENSE-karwantes).

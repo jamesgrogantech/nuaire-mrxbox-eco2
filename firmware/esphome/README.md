@@ -17,8 +17,8 @@ telnet, no unauthenticated OTA; encrypted native API to Home Assistant).
 All the protocol work behind this component, and the emulation design and
 timing, are by **karwantes**:
 [karwantes/Nuaire-MVHR](https://github.com/karwantes/Nuaire-MVHR). This is a
-port of that code to ESPHome. Upstream publishes no license, so the repo's MIT
-license does not cover `components/nuaire_vsc/`; its terms are karwantes'.
+port of that code to ESPHome. Upstream is MIT licensed (Copyright (c) 2026
+karwantes); the notice is kept in `components/nuaire_vsc/LICENSE-karwantes`.
 
 ## Build
 

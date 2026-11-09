@@ -6,6 +6,8 @@
 // the same timing constants. The web UI, telnet, MQTT and VSC-console code are
 // replaced by ESPHome entities.
 //
+// Upstream code Copyright (c) 2026 karwantes, MIT license: see LICENSE-karwantes.
+//
 // How it works (from upstream): the unit polls each VSC slot (88, 8A, AE, C5)
 // with its ID byte; if nobody answers it sends its own default bytes, starting
 // about 25 us after the ID. The XY-485 only drives the bus while TXD is low,
